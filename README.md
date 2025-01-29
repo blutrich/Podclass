@@ -1,4 +1,4 @@
-# PodcastPulse
+# Podclass
 
 A modern podcast learning platform that helps you discover, learn from, and engage with podcast content. Built with React, TypeScript, and Supabase.
 
