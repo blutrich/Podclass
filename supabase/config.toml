@@ -1,0 +1,23 @@
+project_id = "ovdkmtjjxzhppixqorkt"
+
+[db]
+major_version = 15
+
+[auth]
+enabled = true
+
+[storage]
+enabled = true
+
+[realtime]
+enabled = true
+
+[functions]
+[functions.search-podcasts]
+verify_jwt = true
+
+[functions.transcribe-episode]
+verify_jwt = true
+
+[functions.generate-lesson]
+verify_jwt = true
