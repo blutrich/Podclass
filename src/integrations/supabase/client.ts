@@ -29,13 +29,18 @@ supabase.auth.onAuthStateChange(async (event, session) => {
 });
 
 // Test the connection and log the result
-try {
-  const { error } = await supabase.from('podcasts').select('count', { count: 'exact' });
-  if (error) {
-    console.error('Supabase connection error:', error);
-  } else {
-    console.log('Supabase connection successful');
+const testConnection = async () => {
+  try {
+    const { error } = await supabase.from('podcasts').select('count', { count: 'exact' });
+    if (error) {
+      console.error('Supabase connection error:', error);
+    } else {
+      console.log('Supabase connection successful');
+    }
+  } catch (err) {
+    console.error('Failed to connect to Supabase:', err);
   }
-} catch (err) {
-  console.error('Failed to connect to Supabase:', err);
-}
+};
+
+// Run the test connection
+testConnection();
