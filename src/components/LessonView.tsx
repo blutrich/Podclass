@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
-import { Lightbulb, Target, BookOpen, Sparkles } from "lucide-react";
+import { Lightbulb, Target, BookOpen, Sparkles, ImageOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { UniversitySection } from "./UniversitySection";
@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import React from "react";
+import { EnhancedLessonDisplay } from "./lesson/EnhancedLessonDisplay";
 
 interface LessonContent {
   key_takeaways: string[];
@@ -68,6 +69,30 @@ const LessonSection = ({
   );
 };
 
+const FallbackImage = () => (
+  <div className="flex items-center justify-center w-full h-full min-h-[100px] bg-muted rounded-lg">
+    <ImageOff className="h-8 w-8 text-muted-foreground" />
+  </div>
+);
+
+const SafeImage = ({ src, alt, className }: { src: string; alt: string; className?: string }) => {
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError) {
+    return <FallbackImage />;
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      onError={() => setHasError(true)}
+      loading="lazy"
+    />
+  );
+};
+
 export const LessonView = ({ episode }: { episode: Episode }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -122,13 +147,11 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
     enabled: !!episode.id,
   });
 
-  const handleTranscribe = async (): Promise<void> => {
+  const handleTranscribe = async () => {
     if (!episode.audio_url) {
       toast.error("No audio URL available for transcription");
       return;
     }
-
-    let pollInterval: number;
 
     try {
       setIsTranscribing(true);
@@ -148,7 +171,7 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
       if (transcribeError) throw transcribeError;
 
       // Poll for transcription status
-      pollInterval = window.setInterval(async () => {
+      const pollInterval = setInterval(async () => {
         const { data: updatedEpisode } = await supabase
           .from('episodes')
           .select('transcript')
@@ -165,9 +188,11 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
         }
       }, 5000);
 
+      return () => clearInterval(pollInterval);
+
     } catch (error: any) {
       console.error("Error in transcription:", error);
-      toast.error("Failed to transcribe episode. Please try again.");
+      toast.error(error.message || "Failed to transcribe episode");
     } finally {
       setIsTranscribing(false);
     }
@@ -175,137 +200,164 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
 
   const generateLesson = async () => {
     try {
-      // Early validation and logging
-      console.log('Starting lesson generation...', {
-        episodeId: episode.id,
-        hasTranscript: !!episode.transcript,
-        transcriptLength: episode.transcript?.length,
-        formatType
-      });
-
-      if (!episode.transcript) {
+      if (!episode?.transcript) {
         toast.error("Please transcribe the episode first");
         return;
       }
 
-      if (!formatType) {
-        console.log('No format selected, using default');
-        setFormatType('summary');
-        return;
-      }
-
-      // Set loading state immediately
       setIsGenerating(true);
-      toast.info(`Starting ${formatType} generation...`);
-      
-      // Auth check
+      toast.info("Starting lesson generation...");
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast.error("Please sign in to generate lessons");
-        setIsGenerating(false);
         return;
       }
 
-      console.log('Calling generate-lesson edge function...', {
-        userId: user.id,
-        transcriptLength: episode.transcript.length,
-        format: formatType,
+      console.log('Starting lesson generation with transcript length:', episode.transcript.length);
+
+      // Split long transcripts into chunks if needed
+      const maxChunkSize = 25000;
+      let transcript = episode.transcript;
+      if (transcript.length > maxChunkSize) {
+        transcript = transcript.slice(0, maxChunkSize);
+        console.log('Transcript truncated to first chunk:', transcript.length);
+      }
+
+      // Create timeout promise
+      const timeout = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Lesson generation timed out after 3 minutes. Please try again with a shorter transcript.')), 180000);
       });
 
-      // Call edge function with timeout handling
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Request timeout')), 30000)
-      );
-
+      // Make the API call with timeout
       const generatePromise = supabase.functions.invoke(
         'generate-lesson',
         {
           body: {
             episodeId: episode.id,
-            transcript: episode.transcript,
-            promptType: formatType,
+            transcript,
+            promptType: 'summary'
           }
         }
       );
 
-      const { data: generatedLessonData, error: generationError } = await Promise.race([
-        generatePromise,
-        timeoutPromise
-      ]) as any;
+      let result;
+      try {
+        result = await Promise.race([generatePromise, timeout]) as any;
+      } catch (raceError: any) {
+        if (raceError.message?.includes('timed out')) {
+          throw new Error('The lesson generation took too long. Please try with a shorter transcript.');
+        }
+        throw raceError;
+      }
 
-      console.log('Edge function response:', {
-        success: !generationError,
-        error: generationError,
-        data: generatedLessonData,
-      });
+      const { data: generatedLesson, error: generationError } = result;
 
       if (generationError) {
-        console.error('Generation error details:', {
-          message: generationError.message,
-          details: generationError.details,
-          hint: generationError.hint,
-          code: generationError.code
-        });
-        throw generationError;
+        console.error('Generation error:', generationError);
+        throw new Error(generationError.message || 'Failed to generate lesson');
       }
 
-      if (!generatedLessonData?.content) {
-        console.error('Invalid lesson content:', generatedLessonData);
-        throw new Error("Invalid lesson content received. The AI service may be temporarily unavailable.");
+      // Log the full response for debugging
+      console.log('Generated lesson response:', generatedLesson);
+
+      if (!generatedLesson) {
+        console.error('No response received');
+        throw new Error("No response received from lesson generation");
       }
 
-      console.log('Saving lesson to database...');
+      if (generatedLesson.error) {
+        console.error('Server returned error:', generatedLesson.error);
+        throw new Error(generatedLesson.error.message || 'Server error during lesson generation');
+      }
 
+      if (!generatedLesson.data?.content) {
+        console.error('Invalid lesson content structure:', generatedLesson);
+        throw new Error("Invalid or empty lesson content received");
+      }
+
+      const lessonContent = generatedLesson.data.content;
+      console.log('Raw generated lesson content:', lessonContent);
+
+      // Transform the content to match our new structure
+      const transformedContent = {
+        title: lessonContent.title || "Untitled Lesson",
+        summary: lessonContent.summary || "",
+        top_takeaways: Array.isArray(lessonContent.top_takeaways) 
+          ? lessonContent.top_takeaways 
+          : lessonContent.key_takeaways || [],
+        core_concepts: Array.isArray(lessonContent.core_concepts) 
+          ? lessonContent.core_concepts.map(concept => ({
+              name: concept.name || '',
+              what_it_is: concept.what_it_is || concept.definition || '',
+              quote: concept.quote || '',
+              how_to_apply: Array.isArray(concept.how_to_apply) 
+                ? concept.how_to_apply 
+                : concept.application || []
+            }))
+          : [],
+        practical_examples: Array.isArray(lessonContent.practical_examples)
+          ? lessonContent.practical_examples.map(example => ({
+              context: example.context || '',
+              quote: example.quote || '',
+              lesson: example.lesson || example.insight || ''
+            }))
+          : [],
+        action_steps: Array.isArray(lessonContent.action_steps)
+          ? lessonContent.action_steps
+          : []
+      };
+
+      // Save the lesson
       const { error: saveError } = await supabase
         .from("lessons")
         .insert({
           user_id: user.id,
           episode_id: episode.id,
-          lesson_content: generatedLessonData.content,
-          format_type: formatType,
-          status: 'completed',
-          industry_insights: generatedLessonData.industryInsights || [],
-          difficulty_level: 'intermediate'
+          lesson_content: transformedContent,
+          format_type: 'summary',
+          status: 'completed'
         });
 
       if (saveError) {
-        console.error('Error saving lesson:', {
-          error: saveError,
-          details: saveError.details,
-          hint: saveError.hint,
-          code: saveError.code
-        });
+        console.error('Error saving lesson:', saveError);
         throw saveError;
       }
 
-      console.log('Lesson saved successfully, invalidating queries...');
-
-      await queryClient.invalidateQueries({ queryKey: ['lesson', episode.id] });
+      toast.success("Lesson generated and saved successfully!");
+      
+      // Refresh the lessons list
       await queryClient.invalidateQueries({ queryKey: ['lessons'] });
-
-      toast.success(`${formatType} lesson generated successfully!`);
+      await queryClient.invalidateQueries({ queryKey: ['lesson', episode.id] });
 
     } catch (error: any) {
-      console.error("Error in lesson generation:", {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-        details: error.details,
-        code: error.code
-      });
+      console.error("Error in lesson generation:", error);
       
-      // More specific error messages
-      if (error.message?.includes('timeout')) {
-        toast.error("Generation is taking longer than expected. Please try again.");
-      } else if (error.message?.includes('OpenAI')) {
-        toast.error("AI service error. Please try again in a few moments.");
-      } else if (error.code === 'PGRST301') {
-        toast.error("Database error. Please try again.");
-      } else if (error.code === 401 || error.code === 403) {
-        toast.error("Authentication error. Please sign in again.");
-      } else {
-        toast.error(error.message || "Failed to generate lesson. Please try again.");
+      let errorMessage = "Failed to generate lesson. Please try again.";
+      
+      // Handle timeout errors
+      if (error.message?.includes('timed out') || error.message?.includes('timeout')) {
+        errorMessage = "The lesson generation took too long. Please try with a shorter transcript.";
       }
+      // Handle server errors
+      else if (error.message?.includes('Server error')) {
+        const serverError = error.error || error.details;
+        errorMessage = serverError?.message || "Server error during lesson generation. Please try again.";
+      }
+      // Handle OpenAI errors
+      else if (error.message?.includes('OpenAI')) {
+        errorMessage = "AI service error. Please try again in a few moments.";
+      }
+      // Handle network errors
+      else if (error.code === 'ECONNABORTED' || error.message?.includes('network')) {
+        errorMessage = "Network error. Please check your connection and try again.";
+      }
+      // Handle other errors
+      else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setIsGenerating(false);
     }
@@ -325,36 +377,45 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
   }
 
   if (existingLesson) {
+    // Transform the lesson data to match the EnhancedLessonDisplay format
+    const transformedLesson = {
+      title: {
+        text: existingLesson.lesson_content?.title || "Untitled Lesson",
+        maxLength: 10
+      },
+      summary: {
+        paragraphs: existingLesson.lesson_content?.summary 
+          ? [existingLesson.lesson_content.summary]
+          : []
+      },
+      takeaways: {
+        items: (existingLesson.lesson_content?.top_takeaways || []).map((text, index) => ({
+          id: index + 1,
+          text
+        }))
+      },
+      coreConcepts: (existingLesson.lesson_content?.core_concepts || []).map((concept, index) => ({
+        id: index + 1,
+        name: concept.name,
+        definition: concept.what_it_is,
+        quote: concept.quote,
+        applications: concept.how_to_apply || []
+      })),
+      practicalExamples: (existingLesson.lesson_content?.practical_examples || []).map((example, index) => ({
+        id: index + 1,
+        context: example.context,
+        quote: example.quote,
+        lesson: example.lesson
+      })),
+      actionSteps: (existingLesson.lesson_content?.action_steps || []).map((text, index) => ({
+        id: index + 1,
+        text
+      }))
+    };
+
     return (
       <div className="space-y-6">
-        <div className="grid gap-6 md:grid-cols-2">
-          <LessonSection
-            title="Key Takeaways"
-            items={existingLesson.lesson_content?.key_takeaways}
-            icon={Lightbulb}
-            className="bg-blue-50/50 dark:bg-blue-950/20"
-          />
-          {existingLesson.industry_insights && (
-            <LessonSection
-              title="Industry Insights"
-              items={existingLesson.industry_insights}
-              icon={Sparkles}
-              className="bg-purple-50/50 dark:bg-purple-950/20"
-            />
-          )}
-          <LessonSection
-            title="Action Steps"
-            items={existingLesson.lesson_content?.action_steps}
-            icon={Target}
-            className="bg-green-50/50 dark:bg-green-950/20"
-          />
-          <LessonSection
-            title="Reflection Questions"
-            items={existingLesson.lesson_content?.reflection_questions}
-            icon={BookOpen}
-            className="bg-amber-50/50 dark:bg-amber-950/20"
-          />
-        </div>
+        <EnhancedLessonDisplay lesson={transformedLesson} />
         <UniversitySection lessonId={existingLesson.id} />
       </div>
     );

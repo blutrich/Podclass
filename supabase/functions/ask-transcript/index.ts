@@ -1,16 +1,12 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { corsHeaders } from '../_shared/cors.ts';
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-// Add type declarations for Deno env
-declare global {
-  interface Window {
-    Deno: {
-      env: {
-        get(key: string): string | undefined;
-      };
-    };
-  }
-}
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, origin',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+  'Access-Control-Max-Age': '86400',
+  'Content-Type': 'application/json'
+};
 
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 
@@ -83,8 +79,22 @@ serve(async (req) => {
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { 
+      status: 204,
+      headers: {
+        ...corsHeaders,
+        'Access-Control-Max-Age': '86400',
+        'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, origin'
+      }
+    });
   }
+
+  // For non-OPTIONS requests, always include CORS headers
+  const headers = {
+    ...corsHeaders,
+    'Access-Control-Allow-Origin': '*'
+  };
 
   try {
     // Log OpenAI key status (safely)
@@ -105,7 +115,7 @@ serve(async (req) => {
         { 
           status: 500,
           headers: {
-            ...corsHeaders,
+            ...headers,
             'Content-Type': 'application/json'
           }
         }
@@ -133,7 +143,7 @@ serve(async (req) => {
         { 
           status: 400,
           headers: {
-            ...corsHeaders,
+            ...headers,
             'Content-Type': 'application/json'
           }
         }
@@ -154,7 +164,7 @@ serve(async (req) => {
         { 
           status: 400,
           headers: {
-            ...corsHeaders,
+            ...headers,
             'Content-Type': 'application/json'
           }
         }
@@ -172,7 +182,7 @@ serve(async (req) => {
         { 
           status: 400,
           headers: {
-            ...corsHeaders,
+            ...headers,
             'Content-Type': 'application/json'
           }
         }
@@ -232,7 +242,7 @@ serve(async (req) => {
         { 
           status: response.status,
           headers: {
-            ...corsHeaders,
+            ...headers,
             'Content-Type': 'application/json'
           }
         }
@@ -259,7 +269,7 @@ serve(async (req) => {
         { 
           status: 500,
           headers: {
-            ...corsHeaders,
+            ...headers,
             'Content-Type': 'application/json'
           }
         }
@@ -280,7 +290,7 @@ serve(async (req) => {
       }),
       { 
         headers: {
-          ...corsHeaders,
+          ...headers,
           'Content-Type': 'application/json'
         }
       }
@@ -303,7 +313,7 @@ serve(async (req) => {
       { 
         status: 500,
         headers: {
-          ...corsHeaders,
+          ...headers,
           'Content-Type': 'application/json'
         }
       }

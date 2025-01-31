@@ -335,81 +335,81 @@ export const EpisodeDetails = ({ episode }: { episode: Episode }) => {
   };
 
   const handleTranscribe = async () => {
+    if (!episode.audio_url) {
+      uiToast({
+        description: "No audio URL available for transcription",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsTranscribing(true);
+    setTranscriptionProgress(0);
+
     try {
-      console.log('Starting transcription for episode:', episode.id);
-      setIsTranscribing(true);
-      setTranscriptionProgress(0);
-      
-      if (!episode.audio_url) {
-        throw new Error("No audio URL available for transcription");
+      // Get the session for the auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('No authentication token available');
       }
 
-      // Start progress animation
-      progressIntervalRef.current = setInterval(() => {
-        setTranscriptionProgress(prev => {
-          if (prev >= 90) return prev;
-          return prev + Math.random() * 10;
-        });
-      }, 2000);
+      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-episode`;
+      console.log('Calling Edge Function URL:', functionUrl);
+      console.log('Audio URL:', episode.audio_url);
+      console.log('Episode ID:', episode.id);
 
       // Start transcription
-      const { error: transcriptionError } = await supabase.functions.invoke(
-        'transcribe-episode',
-        {
-          body: {
-            audioUrl: episode.audio_url,
-            episodeId: episode.id,
-          }
-        }
-      );
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          audioUrl: episode.audio_url,
+          episodeId: episode.id,
+        }),
+      });
 
-      if (transcriptionError) throw transcriptionError;
+      console.log('Response status:', response.status);
+      const responseData = await response.text();
+      console.log('Response data:', responseData);
+
+      if (!response.ok) {
+        throw new Error(responseData || `HTTP error! status: ${response.status}`);
+      }
+
+      // Start progress simulation
+      progressIntervalRef.current = setInterval(() => {
+        setTranscriptionProgress(prev => {
+          const next = prev + Math.random() * 10;
+          return next > 95 ? 95 : next;
+        });
+      }, 3000);
 
       // Poll for completion
-      let attempts = 0;
-      const maxAttempts = 60; // 5 minutes maximum (with 5-second intervals)
-      
       pollIntervalRef.current = setInterval(async () => {
-        attempts++;
-        console.log(`Checking transcription status (attempt ${attempts}/${maxAttempts})`);
-        
-        const isComplete = await checkTranscriptionStatus();
-        
-        if (isComplete) {
-          console.log('Transcription completed successfully');
-          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-          if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+        const { data: updatedEpisode } = await refetchEpisode();
+        if (updatedEpisode?.transcript) {
+          clearInterval(pollIntervalRef.current);
+          clearInterval(progressIntervalRef.current);
           setTranscriptionProgress(100);
-          
-          await refetchEpisode();
-          
-          // Invalidate and refetch lesson content
-          await queryClient.invalidateQueries({
-            queryKey: ['lesson', episode.id]
-          });
-          
-          uiToast({
-            title: "Success",
-            description: "Episode transcribed successfully",
-          });
-          
           setIsTranscribing(false);
-        } else if (attempts >= maxAttempts) {
-          throw new Error("Transcription is taking longer than expected");
+          uiToast({
+            description: "Episode transcription completed",
+          });
         }
       }, 5000);
 
-    } catch (error: any) {
-      console.error("Error in transcription process:", error);
+    } catch (error) {
+      console.error('Transcription error:', error);
+      clearInterval(progressIntervalRef.current);
+      clearInterval(pollIntervalRef.current);
       setIsTranscribing(false);
       setTranscriptionProgress(0);
-      
-      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-      
       uiToast({
-        title: "Error",
-        description: error.message || "Failed to transcribe episode. Please try again.",
+        description: error.message || "Failed to transcribe episode",
         variant: "destructive",
       });
     }
@@ -571,10 +571,11 @@ export const EpisodeDetails = ({ episode }: { episode: Episode }) => {
       )}
 
       {/* Chat Interface - Only show if transcript exists */}
-      {displayEpisode.transcript && !isTranscribing && (
-        <div className="border-2 border-black dark:border-white rounded-lg p-6">
-          <TranscriptChat transcript={displayEpisode.transcript} />
-        </div>
+      {showTranscript && episode.transcript && (
+        <TranscriptChat 
+          transcript={episode.transcript} 
+          episodeId={episode.id}
+        />
       )}
     </div>
   );

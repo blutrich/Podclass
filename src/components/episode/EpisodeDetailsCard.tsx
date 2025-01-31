@@ -3,6 +3,7 @@ import { Calendar, Clock, Mic2, Radio, Tag, Volume2, Link as LinkIcon, ExternalL
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { SafeImage } from "@/components/ui/safe-image";
 import {
   Collapsible,
   CollapsibleContent,
@@ -69,7 +70,7 @@ export function EpisodeDetailsCard({ episode, className }: EpisodeDetailsCardPro
       <CardHeader className="border-b bg-muted/50 pb-4">
         <div className="flex items-start gap-4">
           {episode.podcast?.image_url && (
-            <img
+            <SafeImage
               src={episode.podcast.image_url}
               alt={episode.podcast.name || "Podcast cover"}
               className="h-24 w-24 rounded-lg object-cover shadow-md"

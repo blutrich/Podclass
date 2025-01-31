@@ -1,21 +1,11 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createHash } from "https://deno.land/std@0.177.0/crypto/mod.ts";
-
-// Add type declarations for Deno env
-declare global {
-  interface Window {
-    Deno: {
-      env: {
-        get(key: string): string | undefined;
-      };
-    };
-  }
-}
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, origin',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+  'Access-Control-Max-Age': '86400',
   'Content-Type': 'application/json'
 }
 
@@ -29,21 +19,32 @@ function isValidUrl(urlString: string): boolean {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { 
-      headers: corsHeaders,
-      status: 204
+      status: 204, // Use 204 for successful preflight
+      headers: {
+        ...corsHeaders,
+        'Access-Control-Max-Age': '86400',
+        'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, origin'
+      }
     });
   }
+
+  // For non-OPTIONS requests, always include CORS headers
+  const headers = {
+    ...corsHeaders,
+    'Access-Control-Allow-Origin': req.headers.get('origin') || '*'
+  };
 
   try {
     console.log('Received request:', req.method);
     const { searchQuery, podcastUrl, filters = {} } = await req.json();
     console.log('Search request:', { searchQuery, podcastUrl, filters });
 
-    const apiKey = Deno.env.get("PODCAST_INDEX_API_KEY");
-    const apiSecret = Deno.env.get("PODCAST_INDEX_API_SECRET");
+    const apiKey = Deno.env.get('PODCAST_INDEX_API_KEY');
+    const apiSecret = Deno.env.get('PODCAST_INDEX_API_SECRET');
     
     if (!apiKey || !apiSecret) {
       console.error('Missing API credentials');
@@ -52,10 +53,7 @@ serve(async (req) => {
           error: 'API credentials not configured',
           data: { searchResults: [] }
         }),
-        { 
-          headers: corsHeaders,
-          status: 200
-        }
+        { headers }
       );
     }
 
@@ -67,10 +65,7 @@ serve(async (req) => {
           details: 'Either searchQuery or podcastUrl must be provided',
           data: { searchResults: [] }
         }),
-        { 
-          headers: corsHeaders,
-          status: 200
-        }
+        { headers }
       );
     }
 
@@ -82,10 +77,7 @@ serve(async (req) => {
           details: 'Please provide a valid URL starting with http:// or https://',
           data: { searchResults: [] }
         }),
-        { 
-          headers: corsHeaders,
-          status: 200
-        }
+        { headers }
       );
     }
 
@@ -94,7 +86,7 @@ serve(async (req) => {
     
     const encoder = new TextEncoder();
     const data = encoder.encode(authString);
-    const hashBuffer = await createHash('SHA-1', data);
+    const hashBuffer = await crypto.subtle.digest('SHA-1', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
@@ -161,10 +153,7 @@ serve(async (req) => {
               : 'Invalid search query. Please try a different search term.',
             data: { searchResults: [] }
           }),
-          { 
-            headers: corsHeaders,
-            status: 200
-          }
+          { headers }
         );
       }
       
@@ -174,10 +163,7 @@ serve(async (req) => {
           details: 'The podcast search service is currently unavailable. Please try again later.',
           data: { searchResults: [] }
         }),
-        { 
-          headers: corsHeaders,
-          status: 200
-        }
+        { headers }
       );
     }
 
@@ -191,10 +177,7 @@ serve(async (req) => {
           details: 'No results found',
           data: { searchResults: [] }
         }),
-        { 
-          headers: corsHeaders,
-          status: 200
-        }
+        { headers }
       );
     }
 
@@ -209,7 +192,7 @@ serve(async (req) => {
               query: podcastUrl
             }
           }),
-          { headers: corsHeaders }
+          { headers }
         );
       }
       searchResults = [{
@@ -233,7 +216,7 @@ serve(async (req) => {
               query: searchQuery
             }
           }),
-          { headers: corsHeaders }
+          { headers }
         );
       }
 
@@ -258,7 +241,7 @@ serve(async (req) => {
           query: podcastUrl || searchQuery,
         }
       }),
-      { headers: corsHeaders }
+      { headers }
     );
 
   } catch (error) {
@@ -269,10 +252,7 @@ serve(async (req) => {
         details: 'An unexpected error occurred while searching for podcasts',
         data: { searchResults: [] }
       }),
-      { 
-        headers: corsHeaders,
-        status: 200
-      }
+      { headers }
     );
   }
 });

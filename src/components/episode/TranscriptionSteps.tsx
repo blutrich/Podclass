@@ -11,6 +11,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+interface Episode {
+  id: string;
+  name: string;
+  audio_url: string | null;
+  transcript: string | null;
+  description: string | null;
+  published_at?: string;
+  duration?: string;
+  podcast: {
+    id: string;
+    name: string;
+    description: string | null;
+    image_url: string | null;
+  } | null;
+}
+
 const LESSON_FORMATS = {
   summary: "Quick Summary",
   technical: "Technical Deep Dive",
@@ -27,10 +43,11 @@ interface TranscriptionStepsProps {
   isTranscribing: boolean;
   isGeneratingLesson: boolean;
   transcriptionProgress: number;
-  selectedFormat: string;
-  onFormatChange: (format: string) => void;
-  onTranscribe: () => Promise<void>;
-  onGenerateLesson: () => Promise<void>;
+  onTranscribe: () => void;
+  onGenerateLesson: () => void;
+  selectedFormat?: string;
+  onFormatChange?: (format: string) => void;
+  episode?: Episode;
 }
 
 export function TranscriptionSteps({
@@ -38,10 +55,11 @@ export function TranscriptionSteps({
   isTranscribing,
   isGeneratingLesson,
   transcriptionProgress,
-  selectedFormat,
-  onFormatChange,
   onTranscribe,
   onGenerateLesson,
+  selectedFormat,
+  onFormatChange,
+  episode
 }: TranscriptionStepsProps) {
   const handleGenerateClick = () => {
     console.log('Generate button clicked', {

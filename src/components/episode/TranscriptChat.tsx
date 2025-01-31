@@ -1,15 +1,40 @@
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Send } from "lucide-react";
+import { Loader2, Send, HelpCircle, BookmarkPlus, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { LessonDisplay } from "./LessonDisplay";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { toast } from "sonner";
 
 // Constants for validation and chunking
 const MIN_QUESTION_LENGTH = 15;
 const MIN_TRANSCRIPT_LENGTH = 100;
 const MAX_TRANSCRIPT_LENGTH = 30000; // Reduced from 100000 to 30000
 const CHUNK_SIZE = 25000; // Size of each transcript chunk
+
+// Conversation starters
+const CONVERSATION_STARTERS = {
+  general: [
+    "What are the main topics discussed in this episode?",
+    "Can you summarize the key insights shared?",
+    "What were the most important takeaways?",
+  ],
+  specific: [
+    "What practical advice or tips were given?",
+    "Were there any interesting examples or case studies mentioned?",
+    "What challenges or problems were discussed and their solutions?",
+  ],
+  learning: [
+    "Generate a lesson from this episode's content",
+    "What are the core concepts I should understand from this episode?",
+    "How can I apply the insights from this episode in practice?",
+  ]
+};
 
 interface Message {
   role: 'user' | 'assistant';
@@ -20,6 +45,7 @@ interface Message {
 
 interface TranscriptChatProps {
   transcript: string;
+  episodeId: string;
 }
 
 // Utility functions for transcript preprocessing
@@ -73,7 +99,145 @@ function validateTranscript(transcript: string): { isValid: boolean; error?: str
   return { isValid: true };
 }
 
-export function TranscriptChat({ transcript }: TranscriptChatProps) {
+// Conversation Starters Component
+const ConversationStarters = ({ onSelect }: { onSelect: (question: string) => void }) => (
+  <Popover>
+    <PopoverTrigger asChild>
+      <Button 
+        variant="outline" 
+        size="icon"
+        className="absolute right-16 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+      >
+        <HelpCircle className="h-4 w-4" />
+      </Button>
+    </PopoverTrigger>
+    <PopoverContent className="w-80 p-4" align="end">
+      <div className="space-y-4">
+        <div>
+          <h4 className="font-medium mb-2 text-sm">General Questions</h4>
+          <div className="space-y-2">
+            {CONVERSATION_STARTERS.general.map((question, i) => (
+              <button
+                key={i}
+                onClick={() => onSelect(question)}
+                className="text-sm text-muted-foreground hover:text-foreground block w-full text-left hover:bg-accent rounded px-2 py-1 transition-colors"
+              >
+                {question}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <h4 className="font-medium mb-2 text-sm">Specific Details</h4>
+          <div className="space-y-2">
+            {CONVERSATION_STARTERS.specific.map((question, i) => (
+              <button
+                key={i}
+                onClick={() => onSelect(question)}
+                className="text-sm text-muted-foreground hover:text-foreground block w-full text-left hover:bg-accent rounded px-2 py-1 transition-colors"
+              >
+                {question}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <h4 className="font-medium mb-2 text-sm">Learning & Application</h4>
+          <div className="space-y-2">
+            {CONVERSATION_STARTERS.learning.map((question, i) => (
+              <button
+                key={i}
+                onClick={() => onSelect(question)}
+                className="text-sm text-muted-foreground hover:text-foreground block w-full text-left hover:bg-accent rounded px-2 py-1 transition-colors"
+              >
+                {question}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </PopoverContent>
+  </Popover>
+);
+
+// Update SaveLesson component
+const SaveLesson = ({ lesson, episodeId }: { lesson: string; episodeId: string }) => {
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) throw userError;
+      
+      if (!user) {
+        toast.error('Please sign in to save lessons');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('saved_lessons')
+        .insert([
+          { 
+            episode_id: episodeId,
+            content: lesson,
+            user_id: user.id,
+            created_at: new Date().toISOString()
+          }
+        ]);
+
+      if (error) {
+        if (error.code === '23505') { // Unique violation
+          toast.error('You have already saved this lesson');
+        } else {
+          throw error;
+        }
+        return;
+      }
+
+      setIsSaved(true);
+      toast.success('Lesson saved successfully!');
+    } catch (error) {
+      console.error('Error saving lesson:', error);
+      toast.error('Failed to save lesson. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleSave}
+      disabled={isSaving || isSaved}
+      className="mt-2 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/10"
+    >
+      {isSaved ? (
+        <>
+          <Check className="h-4 w-4 mr-2" />
+          Saved
+        </>
+      ) : isSaving ? (
+        <>
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          Saving...
+        </>
+      ) : (
+        <>
+          <BookmarkPlus className="h-4 w-4 mr-2" />
+          Save for Later
+        </>
+      )}
+    </Button>
+  );
+};
+
+export function TranscriptChat({ transcript, episodeId }: TranscriptChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -281,7 +445,10 @@ export function TranscriptChat({ transcript }: TranscriptChatProps) {
                 } p-4`}
               >
                 {message.role === 'assistant' && message.type === 'lesson' ? (
-                  <LessonDisplay lesson={message.content} />
+                  <div>
+                    <LessonDisplay lesson={message.content} />
+                    <SaveLesson lesson={message.content} episodeId={episodeId} />
+                  </div>
                 ) : (
                   <p className={`text-sm leading-relaxed whitespace-pre-wrap ${
                     message.role === 'user' 
@@ -310,7 +477,7 @@ export function TranscriptChat({ transcript }: TranscriptChatProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 border-t border-gray-800 bg-gray-900/95 backdrop-blur supports-[backdrop-filter]:bg-gray-900/80">
-          <div className="flex gap-3 max-w-4xl mx-auto">
+          <div className="flex gap-3 max-w-4xl mx-auto relative">
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -320,6 +487,7 @@ export function TranscriptChat({ transcript }: TranscriptChatProps) {
                 hover:bg-gray-800/80"
               disabled={isLoading}
             />
+            <ConversationStarters onSelect={(question) => setInput(question)} />
             <Button 
               type="submit" 
               disabled={isLoading || !input.trim()}

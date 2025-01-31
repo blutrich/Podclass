@@ -1,5 +1,6 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { SafeImage } from "@/components/ui/safe-image";
 
 interface PodcastHeaderProps {
   title: string;
@@ -14,7 +15,7 @@ export const PodcastHeader = ({ title, author, imageUrl, description }: PodcastH
   return (
     <div className="space-y-3">
       <div className={`${isMobile ? 'w-24 h-24' : 'w-32 h-32'} overflow-hidden rounded-lg shrink-0`}>
-        <img
+        <SafeImage
           src={imageUrl}
           alt={title}
           className="w-full h-full object-cover"

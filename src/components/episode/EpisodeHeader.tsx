@@ -1,5 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { useState } from "react";
+import { SafeImage } from "@/components/ui/safe-image";
 
 interface EpisodeHeaderProps {
   title: string;
@@ -21,7 +22,7 @@ export const EpisodeHeader: React.FC<EpisodeHeaderProps> = ({
         <Card className="md:max-w-md">
           <CardContent className="p-0">
             <div className="aspect-square md:aspect-video relative overflow-hidden rounded-lg">
-              <img
+              <SafeImage
                 src={imageUrl}
                 alt={podcastName || "Podcast cover"}
                 className="object-cover w-full h-full"
