@@ -27,8 +27,10 @@ interface TranscriptionStepsProps {
   isTranscribing: boolean;
   isGeneratingLesson: boolean;
   transcriptionProgress: number;
-  onTranscribe: () => void;
-  onGenerateLesson: () => void;
+  selectedFormat: string;
+  onFormatChange: (format: string) => void;
+  onTranscribe: () => Promise<void>;
+  onGenerateLesson: () => Promise<void>;
 }
 
 export function TranscriptionSteps({
@@ -36,6 +38,8 @@ export function TranscriptionSteps({
   isTranscribing,
   isGeneratingLesson,
   transcriptionProgress,
+  selectedFormat,
+  onFormatChange,
   onTranscribe,
   onGenerateLesson,
 }: TranscriptionStepsProps) {

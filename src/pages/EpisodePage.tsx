@@ -8,6 +8,22 @@ import { EpisodeDetails } from "@/components/EpisodeDetails";
 import { LessonView } from "@/components/LessonView";
 import { useQuery } from "@tanstack/react-query";
 
+interface SupabasePodcast {
+  id: string;
+  name: string;
+  description: string | null;
+  image_url: string | null;
+}
+
+interface SupabaseEpisodeData {
+  id: string;
+  name: string;
+  audio_url: string | null;
+  description: string | null;
+  transcript: string | null;
+  podcast: SupabasePodcast | null;
+}
+
 interface PodcastData {
   id: string;
   name: string;
@@ -67,7 +83,7 @@ export function EpisodePage() {
             )
           `)
           .eq("id", episodeId)
-          .maybeSingle();
+          .maybeSingle() as { data: SupabaseEpisodeData | null; error: any };
 
         if (fetchError) {
           console.error('Supabase fetch error:', fetchError);

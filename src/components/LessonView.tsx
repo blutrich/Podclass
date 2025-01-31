@@ -122,11 +122,13 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
     enabled: !!episode.id,
   });
 
-  const handleTranscribe = async () => {
+  const handleTranscribe = async (): Promise<void> => {
     if (!episode.audio_url) {
       toast.error("No audio URL available for transcription");
       return;
     }
+
+    let pollInterval: number;
 
     try {
       setIsTranscribing(true);
@@ -146,7 +148,7 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
       if (transcribeError) throw transcribeError;
 
       // Poll for transcription status
-      const pollInterval = setInterval(async () => {
+      pollInterval = window.setInterval(async () => {
         const { data: updatedEpisode } = await supabase
           .from('episodes')
           .select('transcript')
@@ -163,11 +165,9 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
         }
       }, 5000);
 
-      return () => clearInterval(pollInterval);
-
     } catch (error: any) {
       console.error("Error in transcription:", error);
-      toast.error(error.message || "Failed to transcribe episode");
+      toast.error("Failed to transcribe episode. Please try again.");
     } finally {
       setIsTranscribing(false);
     }

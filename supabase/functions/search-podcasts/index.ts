@@ -1,5 +1,16 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createHash } from "https://deno.land/std@0.177.0/crypto/mod.ts";
+
+// Add type declarations for Deno env
+declare global {
+  interface Window {
+    Deno: {
+      env: {
+        get(key: string): string | undefined;
+      };
+    };
+  }
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,8 +42,8 @@ serve(async (req) => {
     const { searchQuery, podcastUrl, filters = {} } = await req.json();
     console.log('Search request:', { searchQuery, podcastUrl, filters });
 
-    const apiKey = Deno.env.get('PODCAST_INDEX_API_KEY');
-    const apiSecret = Deno.env.get('PODCAST_INDEX_API_SECRET');
+    const apiKey = Deno.env.get("PODCAST_INDEX_API_KEY");
+    const apiSecret = Deno.env.get("PODCAST_INDEX_API_SECRET");
     
     if (!apiKey || !apiSecret) {
       console.error('Missing API credentials');
@@ -83,7 +94,7 @@ serve(async (req) => {
     
     const encoder = new TextEncoder();
     const data = encoder.encode(authString);
-    const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+    const hashBuffer = await createHash('SHA-1', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 

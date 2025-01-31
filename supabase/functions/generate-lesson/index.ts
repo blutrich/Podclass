@@ -1,14 +1,32 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { corsHeaders } from '../_shared/cors.ts';
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+
+// Add type declarations for Deno env
+declare global {
+  interface Window {
+    Deno: {
+      env: {
+        get(key: string): string | undefined;
+      };
+    };
+  }
+}
+
+interface KeyTakeaway {
+  name: string;
+  what_it_is: string;
+  quote: string;
+  how_to_apply: string[];
+}
+
+interface QuoteLesson {
+  context: string;
+  quote: string;
+  lesson: string;
+}
 
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Content-Type': 'application/json'
-};
 
 // Helper function to create error responses
 const createErrorResponse = (message: string, status = 400, details?: any) => {

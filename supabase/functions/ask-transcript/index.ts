@@ -1,5 +1,16 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { corsHeaders } from '../_shared/cors.ts';
+
+// Add type declarations for Deno env
+declare global {
+  interface Window {
+    Deno: {
+      env: {
+        get(key: string): string | undefined;
+      };
+    };
+  }
+}
 
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 
