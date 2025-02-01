@@ -1,15 +1,22 @@
 {
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ],
+  "version": 2,
   "routes": [
+    { "handle": "filesystem" },
     {
-      "src": "/[^.]+",
-      "dest": "/",
-      "status": 200
+      "src": "/episode/.*",
+      "dest": "/index.html"
+    },
+    {
+      "src": "/podcast/.*",
+      "dest": "/index.html"
+    },
+    {
+      "src": "/app.*",
+      "dest": "/index.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 } 
