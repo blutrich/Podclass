@@ -265,58 +265,17 @@ const parsePracticalExamples = (examplesText: string): any[] => {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { 
-      status: 204,
-      headers: {
-        ...corsHeaders,
-        'Access-Control-Max-Age': '86400',
-        'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, origin'
-      }
-    });
+    return new Response(null, { headers: corsHeaders });
   }
 
-  // For non-OPTIONS requests, always include CORS headers
-  const headers = {
-    ...corsHeaders,
-    'Access-Control-Allow-Origin': req.headers.get('origin') || '*'
-  };
-
   try {
-    console.log('Generate lesson function called');
-    
-    // Parse request body
-    const requestData = await req.json().catch(error => {
-      console.error('Error parsing request body:', error);
-      return createErrorResponse('Invalid request body format', 400, error);
-    });
-    
-    const { episodeId, transcript, promptType = 'summary' } = requestData;
-    
-    console.log('Request parameters:', { 
-      episodeId, 
-      transcriptLength: transcript?.length,
-      promptType 
-    });
+    const { transcript, promptType } = await req.json();
 
-    // Validate inputs
-    if (!episodeId) {
-      return createErrorResponse('Episode ID is required', 400);
+    if (!transcript) {
+      return createErrorResponse('Transcript is required');
     }
 
-    if (!transcript || transcript.trim().length === 0) {
-      console.error('No transcript provided for episode:', episodeId);
-      return createErrorResponse('Transcript is required and cannot be empty', 400);
-    }
-
-    if (!openAIApiKey) {
-      console.error('OpenAI API key not configured');
-      return createErrorResponse('OpenAI API key not configured', 500);
-    }
-
-    console.log('Making OpenAI API request...');
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -326,74 +285,58 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'gpt-4',
         messages: [
-          {
-            role: 'system',
-            content: systemPrompt
-          },
-          {
-            role: 'user',
-            content: `Please analyze this podcast transcript and create a structured lesson following the format specified: ${transcript}`
-          }
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Create a structured lesson from this transcript:\n\n${transcript}` }
         ],
         temperature: 0.7,
-        max_tokens: 2000
+        max_tokens: 2500
       })
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: { message: 'Failed to parse error response' } }));
-      console.error('OpenAI API error:', errorData);
-      return createErrorResponse(errorData.error?.message || 'OpenAI API error', response.status, errorData);
+      const error = await response.text();
+      console.error('OpenAI API error:', error);
+      return createErrorResponse('Failed to generate lesson', 500, error);
     }
 
-    let data;
+    const result = await response.json();
+    const content = result.choices[0]?.message?.content;
+
+    if (!content) {
+      return createErrorResponse('No content generated', 500);
+    }
+
     try {
-      data = await response.json();
-    } catch (parseError) {
-      console.error('Error parsing OpenAI response:', parseError);
-      return createErrorResponse('Failed to parse OpenAI response', 500, parseError);
-    }
-
-    console.log('OpenAI API response received');
-
-    if (!data.choices?.[0]?.message?.content) {
-      console.error('Invalid OpenAI response format:', data);
-      return createErrorResponse('Invalid response from OpenAI', 500, data);
-    }
-
-    const content = data.choices[0].message.content;
-    console.log('Raw content from OpenAI:', content);
-
-    // Extract sections using the new helper function
-    const structuredContent = extractSections(content);
-    
-    if (!structuredContent) {
-      console.error('Failed to parse content sections. Raw content:', content);
-      return createErrorResponse('Failed to extract content sections', 500, { content });
-    }
-
-    return new Response(
-      JSON.stringify({ 
-        success: true,
-        data: {
-          content: structuredContent
-        },
-        error: null
-      }),
-      { 
-        headers: {
-          ...headers,
-          'Content-Type': 'application/json'
+      // Parse the content to verify it's valid JSON
+      const parsedContent = JSON.parse(content);
+      
+      // Return success response with the parsed content
+      return new Response(
+        JSON.stringify({
+          data: { content: parsedContent },
+          error: null
+        }),
+        { 
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
         }
-      }
-    );
+      );
+    } catch (parseError) {
+      console.error('Failed to parse generated content:', parseError);
+      return createErrorResponse(
+        'Failed to parse generated content',
+        500,
+        { content }
+      );
+    }
 
   } catch (error) {
-    console.error('Unexpected error in generate-lesson function:', error);
+    console.error('Error in generate-lesson function:', error);
     return createErrorResponse(
-      'Unexpected error processing request',
-      500,
-      error instanceof Error ? { message: error.message, stack: error.stack } : error
+      error instanceof Error ? error.message : 'Unknown error occurred',
+      500
     );
   }
 });
