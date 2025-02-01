@@ -299,9 +299,26 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
       const lessonContent = generatedLesson.data;
       console.log('Extracted lesson content:', lessonContent);
 
+      // Log the content structure for debugging
+      console.log('Content validation check:', {
+        hasTitle: !!lessonContent?.title,
+        hasSummary: !!lessonContent?.summary,
+        hasKeyTakeaways: Array.isArray(lessonContent?.key_takeaways),
+        hasCoreConcepts: Array.isArray(lessonContent?.core_concepts),
+        hasPracticalExamples: Array.isArray(lessonContent?.practical_examples),
+        hasActionSteps: Array.isArray(lessonContent?.action_steps)
+      });
+
       // Validate the content structure
-      if (!lessonContent || !lessonContent.title || !lessonContent.summary) {
-        console.error('Invalid lesson content structure:', generatedLesson);
+      if (!lessonContent || typeof lessonContent.title !== 'string' || typeof lessonContent.summary !== 'string') {
+        console.error('Invalid lesson content structure:', {
+          lessonContent,
+          validationError: {
+            hasContent: !!lessonContent,
+            titleType: typeof lessonContent?.title,
+            summaryType: typeof lessonContent?.summary
+          }
+        });
         throw new Error("Invalid or empty lesson content received");
       }
 
@@ -309,11 +326,13 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
       const transformedContent = {
         title: lessonContent.title,
         summary: lessonContent.summary,
-        key_takeaways: lessonContent.key_takeaways || [],
-        core_concepts: lessonContent.core_concepts || [],
-        practical_examples: lessonContent.practical_examples || [],
-        action_steps: lessonContent.action_steps || []
+        key_takeaways: Array.isArray(lessonContent.key_takeaways) ? lessonContent.key_takeaways : [],
+        core_concepts: Array.isArray(lessonContent.core_concepts) ? lessonContent.core_concepts : [],
+        practical_examples: Array.isArray(lessonContent.practical_examples) ? lessonContent.practical_examples : [],
+        action_steps: Array.isArray(lessonContent.action_steps) ? lessonContent.action_steps : []
       };
+
+      console.log('Transformed content:', transformedContent);
 
       // Save the lesson
       const { error: saveError } = await supabase
