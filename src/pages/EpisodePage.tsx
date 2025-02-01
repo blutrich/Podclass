@@ -140,15 +140,6 @@ export function EpisodePage() {
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
-      <Button
-        variant="ghost"
-        onClick={() => navigate('/app')}
-        className="mb-6"
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Podcast
-      </Button>
-
       <div className="space-y-8">
         <EpisodeDetails episode={episode} />
         <LessonView episode={episode} />

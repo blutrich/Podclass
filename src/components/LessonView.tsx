@@ -153,6 +153,8 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
       return;
     }
 
+    let pollInterval: NodeJS.Timeout;
+
     try {
       setIsTranscribing(true);
       setTranscriptionProgress(0);
@@ -171,31 +173,49 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
       if (transcribeError) throw transcribeError;
 
       // Poll for transcription status
-      const pollInterval = setInterval(async () => {
-        const { data: updatedEpisode } = await supabase
-          .from('episodes')
-          .select('transcript')
-          .eq('id', episode.id)
-          .single();
-        
-        if (updatedEpisode?.transcript) {
+      pollInterval = setInterval(async () => {
+        try {
+          const { data: updatedEpisode, error } = await supabase
+            .from('episodes')
+            .select('transcript')
+            .eq('id', episode.id)
+            .single();
+          
+          if (error) {
+            console.error('Error checking transcription status:', error);
+            return;
+          }
+          
+          if (updatedEpisode?.transcript) {
+            clearInterval(pollInterval);
+            setTranscriptionProgress(100);
+            toast.success("Transcription complete!");
+            
+            // Update the cache and state
+            await queryClient.invalidateQueries({ queryKey: ['episode', episode.id] });
+            setIsTranscribing(false);
+          } else {
+            setTranscriptionProgress((prev) => Math.min(prev + 10, 90));
+          }
+        } catch (pollError) {
+          console.error('Error in transcription polling:', pollError);
           clearInterval(pollInterval);
-          setTranscriptionProgress(100);
-          toast.success("Transcription complete!");
-          window.location.reload();
-        } else {
-          setTranscriptionProgress((prev) => Math.min(prev + 10, 90));
+          setIsTranscribing(false);
+          toast.error("Error checking transcription status");
         }
       }, 5000);
-
-      return () => clearInterval(pollInterval);
 
     } catch (error: any) {
       console.error("Error in transcription:", error);
       toast.error(error.message || "Failed to transcribe episode");
-    } finally {
+      if (pollInterval) clearInterval(pollInterval);
       setIsTranscribing(false);
     }
+
+    // Cleanup function
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
   };
 
   const generateLesson = async () => {
@@ -214,7 +234,11 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
         return;
       }
 
-      console.log('Starting lesson generation with transcript length:', episode.transcript.length);
+      console.log('Starting lesson generation with transcript:', {
+        transcriptLength: episode.transcript.length,
+        episodeId: episode.id,
+        userId: user.id
+      });
 
       // Split long transcripts into chunks if needed
       const maxChunkSize = 25000;
@@ -229,6 +253,7 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
         setTimeout(() => reject(new Error('Lesson generation timed out after 3 minutes. Please try again with a shorter transcript.')), 180000);
       });
 
+      console.log('Calling generate-lesson function...');
       // Make the API call with timeout
       const generatePromise = supabase.functions.invoke(
         'generate-lesson',
@@ -243,8 +268,11 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
 
       let result;
       try {
+        console.log('Awaiting generate-lesson response...');
         result = await Promise.race([generatePromise, timeout]) as any;
+        console.log('Received generate-lesson response:', result);
       } catch (raceError: any) {
+        console.error('Error in race condition:', raceError);
         if (raceError.message?.includes('timed out')) {
           throw new Error('The lesson generation took too long. Please try with a shorter transcript.');
         }
@@ -252,6 +280,7 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
       }
 
       const { data: generatedLesson, error: generationError } = result;
+      console.log('Parsed response:', { data: generatedLesson, error: generationError });
 
       if (generationError) {
         console.error('Generation error:', generationError);
@@ -261,50 +290,53 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
       // Log the full response for debugging
       console.log('Generated lesson response:', generatedLesson);
 
-      if (!generatedLesson) {
+      if (!generatedLesson?.data) {
         console.error('No response received');
         throw new Error("No response received from lesson generation");
       }
 
-      if (generatedLesson.error) {
-        console.error('Server returned error:', generatedLesson.error);
-        throw new Error(generatedLesson.error.message || 'Server error during lesson generation');
-      }
+      // Handle both new and old response formats
+      const lessonContent = generatedLesson.data;
+      console.log('Extracted lesson content:', lessonContent);
 
-      if (!generatedLesson.data?.content) {
+      if (!lessonContent || !lessonContent.title?.text || !lessonContent.summary?.paragraphs) {
         console.error('Invalid lesson content structure:', generatedLesson);
         throw new Error("Invalid or empty lesson content received");
       }
 
-      const lessonContent = generatedLesson.data.content;
       console.log('Raw generated lesson content:', lessonContent);
 
       // Transform the content to match our new structure
+      let parsedContent = lessonContent;
+      console.log('Parsed content:', parsedContent);
+
       const transformedContent = {
-        title: lessonContent.title || "Untitled Lesson",
-        summary: lessonContent.summary || "",
-        top_takeaways: Array.isArray(lessonContent.top_takeaways) 
-          ? lessonContent.top_takeaways 
-          : lessonContent.key_takeaways || [],
-        core_concepts: Array.isArray(lessonContent.core_concepts) 
-          ? lessonContent.core_concepts.map(concept => ({
+        title: parsedContent.title?.text || "Untitled Lesson",
+        summary: Array.isArray(parsedContent.summary?.paragraphs) 
+          ? parsedContent.summary.paragraphs.join('\n\n')
+          : "",
+        top_takeaways: Array.isArray(parsedContent.takeaways?.items) 
+          ? parsedContent.takeaways.items.map(item => item.text)
+          : [],
+        core_concepts: Array.isArray(parsedContent.coreConcepts) 
+          ? parsedContent.coreConcepts.map(concept => ({
               name: concept.name || '',
-              what_it_is: concept.what_it_is || concept.definition || '',
+              what_it_is: concept.definition || '',
               quote: concept.quote || '',
-              how_to_apply: Array.isArray(concept.how_to_apply) 
-                ? concept.how_to_apply 
-                : concept.application || []
+              how_to_apply: Array.isArray(concept.applications) 
+                ? concept.applications 
+                : []
             }))
           : [],
-        practical_examples: Array.isArray(lessonContent.practical_examples)
-          ? lessonContent.practical_examples.map(example => ({
+        practical_examples: Array.isArray(parsedContent.practicalExamples)
+          ? parsedContent.practicalExamples.map(example => ({
               context: example.context || '',
               quote: example.quote || '',
-              lesson: example.lesson || example.insight || ''
+              lesson: example.lesson || ''
             }))
           : [],
-        action_steps: Array.isArray(lessonContent.action_steps)
-          ? lessonContent.action_steps
+        action_steps: Array.isArray(parsedContent.actionSteps)
+          ? parsedContent.actionSteps.map(step => step.text)
           : []
       };
 

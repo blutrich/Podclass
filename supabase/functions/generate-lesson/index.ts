@@ -270,12 +270,16 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Generate lesson function called');
     const { transcript, promptType } = await req.json();
+    console.log('Received request with transcript length:', transcript?.length);
 
     if (!transcript) {
+      console.log('No transcript provided');
       return createErrorResponse('Transcript is required');
     }
 
+    console.log('Calling OpenAI API...');
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -286,7 +290,10 @@ serve(async (req) => {
         model: 'gpt-4',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Create a structured lesson from this transcript:\n\n${transcript}` }
+          { 
+            role: 'user', 
+            content: `Create a structured lesson from this transcript. Your response must be a valid JSON object matching the format specified in the system prompt. Do not include any text outside the JSON object. Here's the transcript:\n\n${transcript}` 
+          }
         ],
         temperature: 0.7,
         max_tokens: 2500
@@ -299,21 +306,32 @@ serve(async (req) => {
       return createErrorResponse('Failed to generate lesson', 500, error);
     }
 
+    console.log('Received response from OpenAI');
     const result = await response.json();
     const content = result.choices[0]?.message?.content;
 
     if (!content) {
+      console.log('No content in OpenAI response');
       return createErrorResponse('No content generated', 500);
     }
 
+    console.log('Raw OpenAI response content:', content);
+    
     try {
       // Parse the content to verify it's valid JSON
       const parsedContent = JSON.parse(content);
+      console.log('Successfully parsed content:', JSON.stringify(parsedContent, null, 2));
+      
+      // Validate the structure
+      if (!parsedContent.title?.text || !parsedContent.summary?.paragraphs || !parsedContent.takeaways?.items) {
+        console.error('Invalid content structure:', parsedContent);
+        return createErrorResponse('Generated content does not match required format', 500, parsedContent);
+      }
       
       // Return success response with the parsed content
       return new Response(
         JSON.stringify({
-          data: { content: parsedContent },
+          data: parsedContent,
           error: null
         }),
         { 
@@ -325,6 +343,7 @@ serve(async (req) => {
       );
     } catch (parseError) {
       console.error('Failed to parse generated content:', parseError);
+      console.log('Raw content that failed to parse:', content);
       return createErrorResponse(
         'Failed to parse generated content',
         500,

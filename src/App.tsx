@@ -7,6 +7,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { SessionContextProvider } from '@supabase/auth-helpers-react';
 import { AppRoutes } from "@/components/routing/AppRoutes";
 
+// Configure future flags for React Router
+const routerConfig = {
+  future: {
+    v7_startTransition: true,
+    v7_relativeSplatPath: true
+  }
+};
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -18,7 +26,7 @@ const queryClient = new QueryClient({
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter {...routerConfig}>
       <SessionContextProvider supabaseClient={supabase}>
         <QueryClientProvider client={queryClient}>
           <div className="min-h-screen bg-background">

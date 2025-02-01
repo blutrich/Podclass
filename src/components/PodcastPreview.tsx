@@ -58,7 +58,16 @@ export function PodcastPreview({
 
   const handleViewEpisode = async (episode: any) => {
     try {
-      const podcastUuid = crypto.randomUUID();
+      // Generate proper UUID v4 format
+      const generateUUID = () => {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          const r = Math.random() * 16 | 0;
+          const v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+      };
+
+      const podcastUuid = generateUUID();
       console.log('Generated UUID for podcast:', podcastUuid);
 
       const { error: podcastError } = await supabase
@@ -72,7 +81,7 @@ export function PodcastPreview({
 
       if (podcastError) throw podcastError;
 
-      const episodeUuid = crypto.randomUUID();
+      const episodeUuid = generateUUID();
       console.log('Generated UUID for episode:', episodeUuid);
 
       const { error: episodeError } = await supabase

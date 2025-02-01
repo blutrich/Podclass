@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface Episode {
   id: string;
@@ -27,6 +28,8 @@ export const LessonGenerationControls = ({
   episode 
 }: LessonGenerationControlsProps) => {
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [transcriptionProgress, setTranscriptionProgress] = useState(0);
+  const queryClient = useQueryClient();
   const [isGeneratingLesson, setIsGeneratingLesson] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
 
@@ -38,6 +41,7 @@ export const LessonGenerationControls = ({
 
     try {
       setIsTranscribing(true);
+      setTranscriptionProgress(0);
       toast.info("Starting transcription...");
       console.log('Starting transcription for episode:', episode.id);
 
@@ -56,33 +60,42 @@ export const LessonGenerationControls = ({
         throw transcribeError;
       }
 
-      console.log('Transcription completed:', transcriptionResult);
-      toast.success("Transcription complete!");
+      // Start polling for completion
+      const pollInterval = setInterval(async () => {
+        const { data: updatedEpisode, error: fetchError } = await supabase
+          .from('episodes')
+          .select('transcript')
+          .eq('id', episode.id)
+          .maybeSingle();
 
-      // Fetch the updated episode to confirm transcript
-      const { data: updatedEpisode, error: fetchError } = await supabase
-        .from('episodes')
-        .select('transcript')
-        .eq('id', episode.id)
-        .maybeSingle();
+        if (fetchError) {
+          console.error('Error checking transcript status:', fetchError);
+          return;
+        }
 
-      if (fetchError) {
-        console.error('Error fetching updated episode:', fetchError);
-        throw fetchError;
-      }
+        if (updatedEpisode?.transcript) {
+          clearInterval(pollInterval);
+          setTranscriptionProgress(100);
+          toast.success("Transcription complete!");
+          
+          // Invalidate and refetch queries with correct syntax
+          await queryClient.invalidateQueries({ queryKey: ['episode', episode.id] });
+          await queryClient.invalidateQueries({ queryKey: ['transcript', episode.id] });
+          
+          setIsTranscribing(false);
+        } else {
+          setTranscriptionProgress((prev) => Math.min(prev + 5, 90));
+        }
+      }, 5000);
 
-      if (!updatedEpisode?.transcript) {
-        throw new Error('Transcript not found after transcription');
-      }
-
-      // Refresh the page to show the transcript
-      window.location.reload();
+      // Cleanup interval on component unmount
+      return () => clearInterval(pollInterval);
 
     } catch (error: any) {
       console.error("Error in transcription:", error);
       toast.error(error.message || "Failed to transcribe episode");
-    } finally {
       setIsTranscribing(false);
+      setTranscriptionProgress(0);
     }
   };
 

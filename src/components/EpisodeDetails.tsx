@@ -10,12 +10,15 @@ import { toast } from "sonner";
 import { EpisodeLoadingSkeleton } from "./episode/EpisodeLoadingSkeleton";
 import { EpisodeDescription } from "./episode/EpisodeDescription";
 import { Card } from "./ui/card";
-import { Calendar, Clock, Loader2, Lightbulb, Target, BookOpen, Sparkles } from "lucide-react";
+import { Calendar, Clock, Loader2, Lightbulb, Target, BookOpen, Sparkles, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { EpisodeDetailsCard } from "./episode/EpisodeDetailsCard";
 import { TranscriptChat } from "./episode/TranscriptChat";
+import { LessonContent } from "./LessonContent";
+import { useNavigate } from "react-router-dom";
+import { Button } from "./ui/button";
 
 interface Episode {
   id: string;
@@ -33,161 +36,6 @@ interface Episode {
   } | null;
 }
 
-const LessonContent = ({ content }: { content: any }) => {
-  if (!content) return null;
-
-  const cleanContent = (text: string | undefined | null) => {
-    if (!text) return '';
-    return text
-      .replace(/^\*\*|\*\*$/g, '')
-      .replace(/^##\s*|####\s*/g, '')
-      .replace(/^[•-]\s*/, '')
-      .replace(/^--$/, '')
-      .trim();
-  };
-
-  const filterValidItems = (items: any[] | undefined) => {
-    if (!items) return [];
-    return items.filter(item => 
-      item && 
-      typeof item === 'string' && 
-      !item.match(/^(####|\*\*|--)$/) && 
-      item.trim().length > 0
-    );
-  };
-
-  return (
-    <div className="max-w-2xl mx-auto space-y-16 py-8">
-      {/* Title */}
-      <div className="border-b-4 border-black dark:border-white pb-6">
-        <h1 className="text-4xl font-extrabold tracking-tight">
-          {cleanContent(content.title) || 'Untitled Lesson'}
-        </h1>
-      </div>
-
-      {/* Summary */}
-      {content.summary && (
-        <div className="space-y-6">
-          <h2 className="text-3xl font-bold tracking-tight">SUMMARY</h2>
-          <div className="prose prose-lg dark:prose-invert">
-            <p>{cleanContent(content.summary)}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Top 3 Takeaways */}
-      {content.top_takeaways?.length > 0 && (
-        <div className="space-y-6">
-          <h2 className="text-3xl font-bold tracking-tight">TOP 3 TAKEAWAYS</h2>
-          <ol className="list-decimal pl-6 space-y-6">
-            {filterValidItems(content.top_takeaways).map((takeaway: string, index: number) => (
-              <li key={index} className="text-xl leading-relaxed pl-2">
-                {cleanContent(takeaway)}
-              </li>
-            ))}
-          </ol>
-        </div>
-      )}
-
-      {/* Core Concepts */}
-      {content.core_concepts?.length > 0 && (
-        <div className="space-y-12">
-          <h2 className="text-3xl font-bold tracking-tight">CORE CONCEPTS</h2>
-          <div className="divide-y-2 divide-black dark:divide-white">
-            {content.core_concepts.map((concept: any, index: number) => (
-              <div key={index} className="py-8 first:pt-0 last:pb-0">
-                <h3 className="text-2xl font-bold mb-6">
-                  {cleanContent(concept.name)}
-                </h3>
-                <div className="space-y-6">
-                  <div>
-                    <h4 className="text-lg font-semibold mb-3">Definition</h4>
-                    <p className="text-xl leading-relaxed">
-                      {cleanContent(concept.what_it_is)}
-                    </p>
-                  </div>
-                  {concept.quote && (
-                    <div>
-                      <h4 className="text-lg font-semibold mb-3">Quote</h4>
-                      <blockquote className="text-xl italic border-l-4 border-black dark:border-white pl-6 py-1">
-                        "{cleanContent(concept.quote)}"
-                      </blockquote>
-                    </div>
-                  )}
-                  {concept.how_to_apply?.length > 0 && (
-                    <div>
-                      <h4 className="text-lg font-semibold mb-3">Application</h4>
-                      <ul className="space-y-4">
-                        {filterValidItems(concept.how_to_apply).map((point: string, i: number) => (
-                          <li key={i} className="text-xl leading-relaxed flex items-start">
-                            <span className="mr-4">-</span>
-                            <span>{cleanContent(point)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Practical Examples */}
-      {content.practical_examples?.length > 0 && (
-        <div className="space-y-12">
-          <h2 className="text-3xl font-bold tracking-tight">PRACTICAL EXAMPLES</h2>
-          <div className="divide-y-2 divide-black dark:divide-white">
-            {content.practical_examples.map((example: any, index: number) => (
-              <div key={index} className="py-8 first:pt-0 last:pb-0">
-                <div className="space-y-6">
-                  <div>
-                    <h4 className="text-lg font-semibold mb-3">Context</h4>
-                    <p className="text-xl leading-relaxed">
-                      {cleanContent(example.context)}
-                    </p>
-                  </div>
-                  {example.quote && (
-                    <div>
-                      <h4 className="text-lg font-semibold mb-3">Quote</h4>
-                      <blockquote className="text-xl italic border-l-4 border-black dark:border-white pl-6 py-1">
-                        "{cleanContent(example.quote)}"
-                      </blockquote>
-                    </div>
-                  )}
-                  {example.lesson && (
-                    <div>
-                      <h4 className="text-lg font-semibold mb-3">Insight</h4>
-                      <p className="text-xl leading-relaxed">
-                        {cleanContent(example.lesson)}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Action Steps */}
-      {content.action_steps?.length > 0 && (
-        <div className="space-y-6">
-          <h2 className="text-3xl font-bold tracking-tight">ACTION STEPS</h2>
-          <ol className="list-decimal pl-6 space-y-6">
-            {filterValidItems(content.action_steps).map((step: string, index: number) => (
-              <li key={index} className="text-xl leading-relaxed pl-2">
-                {cleanContent(step)}
-              </li>
-            ))}
-          </ol>
-        </div>
-      )}
-    </div>
-  );
-};
-
 export const EpisodeDetails = ({ episode }: { episode: Episode }) => {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcriptionProgress, setTranscriptionProgress] = useState(0);
@@ -197,20 +45,12 @@ export const EpisodeDetails = ({ episode }: { episode: Episode }) => {
   const progressIntervalRef = useRef<ReturnType<typeof setInterval>>();
   const pollIntervalRef = useRef<ReturnType<typeof setInterval>>();
   const [showTranscript, setShowTranscript] = useState(false);
+  const navigate = useNavigate();
 
-  // Cleanup intervals on unmount
-  useEffect(() => {
-    return () => {
-      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-    };
-  }, []);
-
-  // Fetch updated episode data with caching
-  const { data: updatedEpisode, refetch: refetchEpisode } = useQuery({
+  // Fetch episode data with automatic updates
+  const { data: updatedEpisode } = useQuery({
     queryKey: ['episode', episode.id],
     queryFn: async () => {
-      console.log('Fetching updated episode data');
       const { data, error } = await supabase
         .from('episodes')
         .select('*, podcast:podcasts (*)')
@@ -222,28 +62,18 @@ export const EpisodeDetails = ({ episode }: { episode: Episode }) => {
         throw error;
       }
 
-      // Transform the data to match Episode type
-      const transformedData: Episode = {
-        id: data.id,
-        name: data.name,
-        audio_url: data.audio_url,
-        transcript: data.transcript,
-        description: data.description,
-        published_at: data.published_at,
-        duration: data.duration,
+      return {
+        ...data,
         podcast: data.podcast ? {
           id: data.podcast.id,
           name: data.podcast.name,
           description: data.podcast.description,
           image_url: data.podcast.image_url
         } : null
-      };
-
-      return transformedData;
+      } as Episode;
     },
-    enabled: false,
-    staleTime: 300000, // 5 minutes
-    gcTime: 1800000, // 30 minutes
+    staleTime: 1000, // Update every second when needed
+    refetchInterval: isTranscribing ? 1000 : false, // Poll while transcribing
   });
 
   // Lesson content query with persistence
@@ -310,106 +140,80 @@ export const EpisodeDetails = ({ episode }: { episode: Episode }) => {
     },
   });
 
-  // Check transcription status
-  const checkTranscriptionStatus = async () => {
-    console.log('Checking transcription status for episode:', episode.id);
-    try {
-      const { data, error } = await supabase
-        .from('episodes')
-        .select('transcript')
-        .eq('id', episode.id)
-        .single();
-      
-      if (error) {
-        console.error('Error checking transcription status:', error);
-        return false;
-      }
-      
-      const hasTranscript = !!data?.transcript;
-      console.log('Transcription status:', hasTranscript ? 'Complete' : 'In Progress');
-      return hasTranscript;
-    } catch (error) {
-      console.error('Error in checkTranscriptionStatus:', error);
-      return false;
-    }
-  };
-
   const handleTranscribe = async () => {
-    if (!episode.audio_url) {
-      uiToast({
-        description: "No audio URL available for transcription",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsTranscribing(true);
-    setTranscriptionProgress(0);
-
     try {
-      // Get the session for the auth token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        throw new Error('No authentication token available');
+      setIsTranscribing(true);
+      setTranscriptionProgress(0);
+      
+      if (!episode.audio_url) {
+        throw new Error("No audio URL available for transcription");
       }
 
-      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-episode`;
-      console.log('Calling Edge Function URL:', functionUrl);
-      console.log('Audio URL:', episode.audio_url);
-      console.log('Episode ID:', episode.id);
-
-      // Start transcription
-      const response = await fetch(functionUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          audioUrl: episode.audio_url,
-          episodeId: episode.id,
-        }),
-      });
-
-      console.log('Response status:', response.status);
-      const responseData = await response.text();
-      console.log('Response data:', responseData);
-
-      if (!response.ok) {
-        throw new Error(responseData || `HTTP error! status: ${response.status}`);
-      }
-
-      // Start progress simulation
+      // Start progress animation
       progressIntervalRef.current = setInterval(() => {
         setTranscriptionProgress(prev => {
-          const next = prev + Math.random() * 10;
-          return next > 95 ? 95 : next;
+          if (prev >= 90) return prev;
+          return prev + Math.random() * 10;
         });
-      }, 3000);
+      }, 2000);
+
+      // Start transcription
+      const { error: transcriptionError } = await supabase.functions.invoke(
+        'transcribe-episode',
+        {
+          body: {
+            audioUrl: episode.audio_url,
+            episodeId: episode.id,
+          }
+        }
+      );
+
+      if (transcriptionError) throw transcriptionError;
 
       // Poll for completion
       pollIntervalRef.current = setInterval(async () => {
-        const { data: updatedEpisode } = await refetchEpisode();
-        if (updatedEpisode?.transcript) {
-          clearInterval(pollIntervalRef.current);
-          clearInterval(progressIntervalRef.current);
+        const { data, error } = await supabase
+          .from('episodes')
+          .select('transcript')
+          .eq('id', episode.id)
+          .single();
+        
+        if (error) {
+          console.error('Error checking transcription status:', error);
+          return;
+        }
+        
+        if (data?.transcript) {
+          // Clear intervals
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+          
+          // Update progress and state
           setTranscriptionProgress(100);
           setIsTranscribing(false);
+          
+          // Update cache
+          await queryClient.invalidateQueries({ queryKey: ['episode', episode.id] });
+          
+          // Show success message
           uiToast({
-            description: "Episode transcription completed",
+            title: "Success",
+            description: "Episode transcribed successfully",
           });
         }
       }, 5000);
 
     } catch (error) {
-      console.error('Transcription error:', error);
-      clearInterval(progressIntervalRef.current);
-      clearInterval(pollIntervalRef.current);
+      console.error("Error in transcription process:", error);
       setIsTranscribing(false);
       setTranscriptionProgress(0);
+      
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      
       uiToast({
-        description: error.message || "Failed to transcribe episode",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to transcribe episode. Please try again.",
         variant: "destructive",
       });
     }
@@ -449,42 +253,70 @@ export const EpisodeDetails = ({ episode }: { episode: Episode }) => {
         throw generationError;
       }
 
+      console.log('Raw generated lesson:', generatedLesson);
+
       if (!generatedLesson?.content) {
         throw new Error("Failed to generate lesson content");
       }
 
-      console.log('Raw generated lesson content:', generatedLesson.content);
+      // Parse the content if it's a string (OpenAI response)
+      let parsedContent;
+      try {
+        parsedContent = typeof generatedLesson.content === 'string' 
+          ? JSON.parse(generatedLesson.content)
+          : generatedLesson.content;
+      } catch (parseError) {
+        console.error('Error parsing lesson content:', parseError);
+        throw new Error("Failed to parse lesson content");
+      }
 
-      // Transform the content to match our new structure
+      console.log('Parsed lesson content:', parsedContent);
+
+      // Transform and validate the content
       const transformedContent = {
-        title: generatedLesson.content.title || "Untitled Lesson",
-        summary: generatedLesson.content.summary || "",
-        top_takeaways: Array.isArray(generatedLesson.content.top_takeaways) 
-          ? generatedLesson.content.top_takeaways 
-          : generatedLesson.content.key_takeaways || [],
-        core_concepts: Array.isArray(generatedLesson.content.core_concepts) 
-          ? generatedLesson.content.core_concepts.map(concept => ({
-              name: concept.name || '',
-              what_it_is: concept.what_it_is || concept.definition || '',
-              quote: concept.quote || '',
-              how_to_apply: Array.isArray(concept.how_to_apply) 
-                ? concept.how_to_apply 
-                : concept.application || []
-            }))
+        title: parsedContent.title?.text || parsedContent.title || "Untitled Lesson",
+        summary: typeof parsedContent.summary === 'string' 
+          ? parsedContent.summary 
+          : parsedContent.summary?.paragraphs?.join('\n\n') || "",
+        top_takeaways: Array.isArray(parsedContent.takeaways?.items) 
+          ? parsedContent.takeaways.items.map(item => item.text)
+          : Array.isArray(parsedContent.top_takeaways)
+          ? parsedContent.top_takeaways
           : [],
-        practical_examples: Array.isArray(generatedLesson.content.practical_examples)
-          ? generatedLesson.content.practical_examples.map(example => ({
-              context: example.context || '',
-              quote: example.quote || '',
-              lesson: example.lesson || example.insight || ''
+        core_concepts: Array.isArray(parsedContent.coreConcepts)
+          ? parsedContent.coreConcepts.map(concept => ({
+              name: concept.name,
+              what_it_is: concept.definition || concept.what_it_is,
+              quote: concept.quote,
+              how_to_apply: Array.isArray(concept.applications) 
+                ? concept.applications 
+                : concept.how_to_apply || []
             }))
+          : Array.isArray(parsedContent.core_concepts)
+          ? parsedContent.core_concepts
           : [],
-        action_steps: Array.isArray(generatedLesson.content.action_steps)
-          ? generatedLesson.content.action_steps
+        practical_examples: Array.isArray(parsedContent.practicalExamples)
+          ? parsedContent.practicalExamples.map(example => ({
+              context: example.context,
+              quote: example.quote,
+              lesson: example.lesson
+            }))
+          : Array.isArray(parsedContent.practical_examples)
+          ? parsedContent.practical_examples
+          : [],
+        action_steps: Array.isArray(parsedContent.actionSteps)
+          ? parsedContent.actionSteps.map(step => step.text)
+          : Array.isArray(parsedContent.action_steps)
+          ? parsedContent.action_steps
           : []
       };
 
       console.log('Transformed lesson content:', transformedContent);
+
+      // Validate the transformed content
+      if (!transformedContent.title || !transformedContent.summary) {
+        throw new Error("Generated lesson is missing required content");
+      }
 
       // Save the lesson
       const { error: saveError } = await supabase
@@ -513,7 +345,23 @@ export const EpisodeDetails = ({ episode }: { episode: Episode }) => {
     }
   };
 
+  // Cleanup intervals on unmount
+  useEffect(() => {
+    return () => {
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
+  }, []);
+
   const displayEpisode = updatedEpisode || episode;
+
+  const handleBackToPodcast = () => {
+    if (episode.podcast?.id) {
+      navigate(`/podcast/${episode.podcast.id}`);
+    } else {
+      navigate('/app');  // Fallback to main app page if no podcast ID
+    }
+  };
 
   if (lessonError) {
     toast("Failed to load lesson content", {
@@ -527,6 +375,18 @@ export const EpisodeDetails = ({ episode }: { episode: Episode }) => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
+      {/* Back Button */}
+      <div className="flex items-center justify-between">
+        <Button
+          variant="ghost"
+          className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+          onClick={handleBackToPodcast}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back to Podcast</span>
+        </Button>
+      </div>
+
       {/* Episode Details */}
       <EpisodeDetailsCard episode={displayEpisode} />
 
@@ -543,7 +403,7 @@ export const EpisodeDetails = ({ episode }: { episode: Episode }) => {
 
       {/* Lesson Content */}
       {lessonContent && (
-        <div className="border-2 border-black dark:border-white rounded-lg p-6">
+        <div className="border-2 border-black dark:border-white rounded-lg">
           <LessonContent content={lessonContent} />
         </div>
       )}
@@ -570,11 +430,11 @@ export const EpisodeDetails = ({ episode }: { episode: Episode }) => {
         </div>
       )}
 
-      {/* Chat Interface - Only show if transcript exists */}
-      {showTranscript && episode.transcript && (
+      {/* Chat Interface */}
+      {updatedEpisode?.transcript && (
         <TranscriptChat 
-          transcript={episode.transcript} 
-          episodeId={episode.id}
+          transcript={updatedEpisode.transcript} 
+          episodeId={updatedEpisode.id}
         />
       )}
     </div>
