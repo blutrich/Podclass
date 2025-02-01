@@ -1,22 +1,21 @@
 {
-  "version": 2,
-  "routes": [
-    { "handle": "filesystem" },
+  "rewrites": [
     {
-      "src": "/episode/.*",
-      "dest": "/index.html"
-    },
-    {
-      "src": "/podcast/.*",
-      "dest": "/index.html"
-    },
-    {
-      "src": "/app.*",
-      "dest": "/index.html"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
-  ]
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "s-maxage=1, stale-while-revalidate"
+        }
+      ]
+    }
+  ],
+  "cleanUrls": true,
+  "trailingSlash": false
 } 
