@@ -4,7 +4,7 @@ interface LessonContentProps {
   content: {
     title: string;
     summary: string;
-    top_takeaways: string[];
+    key_takeaways: string[];
     core_concepts: Array<{
       name: string;
       what_it_is: string;
@@ -42,12 +42,12 @@ export function LessonContent({ content }: LessonContentProps) {
         </Card>
       )}
 
-      {/* Top Takeaways */}
-      {content.top_takeaways?.length > 0 && (
+      {/* Key Takeaways */}
+      {content.key_takeaways?.length > 0 && (
         <Card className="p-6 space-y-4">
           <h2 className="text-2xl font-bold">Key Takeaways</h2>
           <ol className="list-decimal pl-6 space-y-4">
-            {content.top_takeaways.map((takeaway, index) => (
+            {content.key_takeaways.map((takeaway, index) => (
               <li key={index} className="text-lg leading-relaxed">
                 {takeaway}
               </li>

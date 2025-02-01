@@ -295,49 +295,24 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
         throw new Error("No response received from lesson generation");
       }
 
-      // Handle both new and old response formats
+      // Extract the lesson content from the response
       const lessonContent = generatedLesson.data;
       console.log('Extracted lesson content:', lessonContent);
 
-      if (!lessonContent || !lessonContent.title?.text || !lessonContent.summary?.paragraphs) {
+      // Validate the content structure
+      if (!lessonContent || !lessonContent.title || !lessonContent.summary) {
         console.error('Invalid lesson content structure:', generatedLesson);
         throw new Error("Invalid or empty lesson content received");
       }
 
-      console.log('Raw generated lesson content:', lessonContent);
-
-      // Transform the content to match our new structure
-      let parsedContent = lessonContent;
-      console.log('Parsed content:', parsedContent);
-
+      // Transform the content to match our database structure
       const transformedContent = {
-        title: parsedContent.title?.text || "Untitled Lesson",
-        summary: Array.isArray(parsedContent.summary?.paragraphs) 
-          ? parsedContent.summary.paragraphs.join('\n\n')
-          : "",
-        top_takeaways: Array.isArray(parsedContent.takeaways?.items) 
-          ? parsedContent.takeaways.items.map(item => item.text)
-          : [],
-        core_concepts: Array.isArray(parsedContent.coreConcepts) 
-          ? parsedContent.coreConcepts.map(concept => ({
-              name: concept.name || '',
-              what_it_is: concept.definition || '',
-              quote: concept.quote || '',
-              how_to_apply: Array.isArray(concept.applications) 
-                ? concept.applications 
-                : []
-            }))
-          : [],
-        practical_examples: Array.isArray(parsedContent.practicalExamples)
-          ? parsedContent.practicalExamples.map(example => ({
-              context: example.context || '',
-              quote: example.quote || '',
-              lesson: example.lesson || ''
-            }))
-          : [],
-        action_steps: Array.isArray(parsedContent.actionSteps)
-          ? parsedContent.actionSteps.map(step => step.text)
-          : []
+        title: lessonContent.title,
+        summary: lessonContent.summary,
+        top_takeaways: lessonContent.key_takeaways || [],
+        core_concepts: lessonContent.core_concepts || [],
+        practical_examples: lessonContent.practical_examples || [],
+        action_steps: lessonContent.action_steps || []
       };
 
       // Save the lesson
@@ -364,32 +339,7 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
 
     } catch (error: any) {
       console.error("Error in lesson generation:", error);
-      
-      let errorMessage = "Failed to generate lesson. Please try again.";
-      
-      // Handle timeout errors
-      if (error.message?.includes('timed out') || error.message?.includes('timeout')) {
-        errorMessage = "The lesson generation took too long. Please try with a shorter transcript.";
-      }
-      // Handle server errors
-      else if (error.message?.includes('Server error')) {
-        const serverError = error.error || error.details;
-        errorMessage = serverError?.message || "Server error during lesson generation. Please try again.";
-      }
-      // Handle OpenAI errors
-      else if (error.message?.includes('OpenAI')) {
-        errorMessage = "AI service error. Please try again in a few moments.";
-      }
-      // Handle network errors
-      else if (error.code === 'ECONNABORTED' || error.message?.includes('network')) {
-        errorMessage = "Network error. Please check your connection and try again.";
-      }
-      // Handle other errors
-      else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      toast.error(errorMessage);
+      toast.error(error.message || "Failed to generate lesson");
     } finally {
       setIsGenerating(false);
     }
