@@ -296,7 +296,7 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
       }
 
       // Extract the lesson content from the response
-      const lessonContent = generatedLesson.data;
+      const lessonContent = generatedLesson.data?.data || generatedLesson.data;
       console.log('Extracted lesson content:', lessonContent);
 
       // Log the content structure for debugging
@@ -306,7 +306,8 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
         hasKeyTakeaways: Array.isArray(lessonContent?.key_takeaways),
         hasCoreConcepts: Array.isArray(lessonContent?.core_concepts),
         hasPracticalExamples: Array.isArray(lessonContent?.practical_examples),
-        hasActionSteps: Array.isArray(lessonContent?.action_steps)
+        hasActionSteps: Array.isArray(lessonContent?.action_steps),
+        rawContent: lessonContent
       });
 
       // Validate the content structure
@@ -316,7 +317,8 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
           validationError: {
             hasContent: !!lessonContent,
             titleType: typeof lessonContent?.title,
-            summaryType: typeof lessonContent?.summary
+            summaryType: typeof lessonContent?.summary,
+            rawGeneratedLesson: generatedLesson
           }
         });
         throw new Error("Invalid or empty lesson content received");
