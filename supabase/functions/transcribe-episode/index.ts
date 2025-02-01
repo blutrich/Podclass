@@ -3,28 +3,47 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, origin',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': '86400',
 };
 
 serve(async (req) => {
+  // Log request details
+  console.log('Request received:', {
+    method: req.method,
+    url: req.url,
+    headers: Object.fromEntries(req.headers.entries())
+  });
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { 
+      headers: {
+        ...corsHeaders,
+        'Access-Control-Max-Age': '86400',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS'
+      }
+    });
   }
 
   try {
     // Get auth token from request
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.error('No authorization header provided');
       throw new Error('No authorization header');
     }
 
-    // Parse request body
-    const requestData = await req.json().catch(error => {
-      console.error('Error parsing request body:', error);
-      throw new Error('Invalid request body');
-    });
+    // Handle test requests
+    const requestData = await req.json();
+    if (requestData.test) {
+      console.log('Received test request');
+      return new Response(
+        JSON.stringify({ success: true, message: 'Edge Function is accessible' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const { audioUrl, episodeId } = requestData;
     console.log('Processing request for episode:', episodeId, 'with audio:', audioUrl);
@@ -128,11 +147,18 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error in transcribe-episode function:', error);
+    console.error('Error in transcribe-episode function:', {
+      error,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      type: error instanceof Error ? error.constructor.name : typeof error
+    });
+
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : 'Unknown error occurred',
-        details: error instanceof Error ? error.stack : undefined
+        details: error instanceof Error ? error.stack : undefined,
+        type: error instanceof Error ? error.constructor.name : typeof error
       }),
       { 
         status: 500,

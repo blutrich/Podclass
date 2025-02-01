@@ -17,5 +17,9 @@
     }
   ],
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "env": {
+    "VITE_SUPABASE_URL": "https://ovdkmtjjxzhppixqorkt.supabase.co",
+    "VITE_APP_URL": "https://podclass-a9troud0m-blutrichs-projects.vercel.app"
+  }
 } 

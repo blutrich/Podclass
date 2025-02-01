@@ -7,11 +7,18 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
+console.log('Initializing Supabase client with URL:', supabaseUrl);
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true
+  },
+  global: {
+    headers: {
+      'x-client-info': 'podclass-web'
+    }
   }
 });
 
@@ -29,14 +36,33 @@ supabase.auth.onAuthStateChange(async (event, session) => {
 });
 
 // Test the connection and log the result
-supabase.from('podcasts').select('count', { count: 'exact' })
-  .then(({ error }) => {
+const testConnection = async () => {
+  try {
+    const { data, error } = await supabase.from('podcasts').select('count', { count: 'exact' });
     if (error) {
       console.error('Supabase connection error:', error);
     } else {
       console.log('Supabase connection successful');
     }
-  })
-  .catch(err => {
+
+    // Test Edge Function access
+    const { data: functionData, error: functionError } = await supabase.functions.invoke('transcribe-episode', {
+      body: { test: true }
+    });
+    
+    if (functionError) {
+      console.error('Edge Function test error:', {
+        message: functionError.message,
+        name: functionError.name,
+        status: functionError?.status,
+        details: functionError
+      });
+    } else {
+      console.log('Edge Function test successful:', functionData);
+    }
+  } catch (err) {
     console.error('Failed to connect to Supabase:', err);
-  });
+  }
+};
+
+testConnection();
