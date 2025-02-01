@@ -87,6 +87,23 @@ Your response must be valid JSON matching this exact format:
   ]
 }`;
 
+// Helper function to truncate text to approximate token count
+function truncateText(text: string, maxTokens: number): string {
+  // Rough approximation: 1 token ≈ 4 characters for English text
+  const charsPerToken = 4;
+  const maxChars = maxTokens * charsPerToken;
+  
+  if (text.length > maxChars) {
+    // Keep introduction and conclusion, cut from middle
+    const halfLength = Math.floor(maxChars / 2);
+    const firstHalf = text.slice(0, halfLength);
+    const secondHalf = text.slice(-halfLength);
+    return `${firstHalf}\n\n[...middle section omitted for length...]\n\n${secondHalf}`;
+  }
+  
+  return text;
+}
+
 serve(async (req) => {
   console.log('Request received:', req.method);
   console.log('OpenAI API Key configured:', !!openAIApiKey);
@@ -112,6 +129,10 @@ serve(async (req) => {
       return createErrorResponse('OpenAI API key is not configured', 500);
     }
 
+    // Truncate transcript to fit within context window
+    // Reserve tokens: 1000 for system prompt, 500 for safety margin
+    const truncatedTranscript = truncateText(transcript, 4000);
+    
     console.log('Calling OpenAI API...');
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -125,11 +146,11 @@ serve(async (req) => {
           { role: 'system', content: systemPrompt },
           { 
             role: 'user', 
-            content: `Create a structured lesson from this transcript. Ensure your response is valid JSON matching the format specified. Transcript:\n\n${transcript}`
+            content: `Create a structured lesson from this transcript. Note that this is a truncated version of the full transcript, so focus on the key themes and insights that are present. Ensure your response is valid JSON matching the format specified.\n\nTranscript:\n\n${truncatedTranscript}`
           }
         ],
         temperature: 0.7,
-        max_tokens: 2500
+        max_tokens: 2000  // Reduced from 2500
       })
     });
 
