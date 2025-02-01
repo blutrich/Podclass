@@ -309,7 +309,7 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
       const transformedContent = {
         title: lessonContent.title,
         summary: lessonContent.summary,
-        top_takeaways: lessonContent.key_takeaways || [],
+        key_takeaways: lessonContent.key_takeaways || [],
         core_concepts: lessonContent.core_concepts || [],
         practical_examples: lessonContent.practical_examples || [],
         action_steps: lessonContent.action_steps || []
@@ -362,8 +362,7 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
     // Transform the lesson data to match the EnhancedLessonDisplay format
     const transformedLesson = {
       title: {
-        text: existingLesson.lesson_content?.title || "Untitled Lesson",
-        maxLength: 10
+        text: existingLesson.lesson_content?.title || "Untitled Lesson"
       },
       summary: {
         paragraphs: existingLesson.lesson_content?.summary 
@@ -371,7 +370,7 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
           : []
       },
       takeaways: {
-        items: (existingLesson.lesson_content?.top_takeaways || []).map((text, index) => ({
+        items: (existingLesson.lesson_content?.key_takeaways || []).map((text, index) => ({
           id: index + 1,
           text
         }))
