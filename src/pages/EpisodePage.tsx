@@ -14,27 +14,44 @@ export function EpisodePage() {
   const { data: episode, isLoading, error } = useQuery({
     queryKey: ["episode", episodeId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("episodes")
-        .select(`
-          *,
-          podcast:podcasts (
+      try {
+        console.log('Fetching episode with ID:', episodeId);
+        
+        const { data, error } = await supabase
+          .from('episodes')
+          .select(`
             id,
             name,
+            audio_url,
             description,
-            image_url,
-            author,
-            category
-          )
-        `)
-        .eq("id", episodeId)
-        .single();
+            podcast:podcasts (
+              id,
+              name,
+              description,
+              image_url
+            )
+          `)
+          .eq('id', episodeId)
+          .single();
 
-      if (error) throw error;
-      if (!data) throw new Error("Episode not found");
-      return data;
+        if (error) {
+          console.error('Supabase error:', error);
+          throw error;
+        }
+
+        if (!data) {
+          console.error('No episode found with ID:', episodeId);
+          throw new Error("Episode not found");
+        }
+
+        console.log('Fetched episode data:', data);
+        return data;
+      } catch (error) {
+        console.error('Error in episode query:', error);
+        throw error;
+      }
     },
-    retry: 5,
+    retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
   });

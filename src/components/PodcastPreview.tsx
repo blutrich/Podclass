@@ -67,37 +67,52 @@ export function PodcastPreview({
         });
       };
 
-      const podcastUuid = generateUUID();
-      console.log('Generated UUID for podcast:', podcastUuid);
+      // First store the podcast
+      const podcastData = {
+        id: generateUUID(),
+        name: podcast.title,
+        description: podcast.description,
+        image_url: podcast.image
+      };
+      console.log('Storing podcast:', podcastData);
 
       const { error: podcastError } = await supabase
         .from('podcasts')
-        .upsert({
-          id: podcastUuid,
-          name: podcast.title,
-          description: podcast.description,
-          image_url: podcast.image
-        });
+        .upsert(podcastData);
 
-      if (podcastError) throw podcastError;
+      if (podcastError) {
+        console.error('Error storing podcast:', podcastError);
+        throw podcastError;
+      }
 
-      const episodeUuid = generateUUID();
-      console.log('Generated UUID for episode:', episodeUuid);
+      // Then store the episode
+      const episodeData = {
+        id: generateUUID(),
+        name: episode.title,
+        audio_url: episode.audioUrl,
+        podcast_id: podcastData.id,
+        description: episode.description
+      };
+      console.log('Storing episode:', episodeData);
 
       const { error: episodeError } = await supabase
         .from('episodes')
-        .upsert({
-          id: episodeUuid,
-          name: episode.title,
-          audio_url: episode.audioUrl,
-          podcast_id: podcastUuid,
-          description: episode.description
-        });
+        .upsert(episodeData);
 
-      if (episodeError) throw episodeError;
+      if (episodeError) {
+        console.error('Error storing episode:', episodeError);
+        throw episodeError;
+      }
 
-      navigate(`/episode/${episodeUuid}`);
+      // Close the drawer/dialog first
       onClose();
+
+      // Wait for the drawer to close before navigating
+      setTimeout(() => {
+        console.log('Navigating to episode:', episodeData.id);
+        navigate(`/episode/${episodeData.id}`);
+      }, isMobile ? 500 : 0); // Increased delay for mobile
+
     } catch (error) {
       console.error("Error storing episode:", error);
       toast({
@@ -116,30 +131,29 @@ export function PodcastPreview({
             <DrawerTitle>{podcast.title}</DrawerTitle>
             <DrawerDescription>{podcast.author}</DrawerDescription>
           </DrawerHeader>
-          <div className="p-4 space-y-4 overflow-y-auto">
-            <PodcastHeader
-              title={podcast.title}
-              author={podcast.author}
-              imageUrl={podcast.image}
-              description={podcast.description}
-            />
-            {podcast.taddyTranscribeStatus && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-secondary/50 p-2 rounded-md">
-                <FileText className="h-4 w-4" />
-                <span>Transcript available</span>
-              </div>
-            )}
-            <EpisodesList
-              podcastId={podcast.id}
-              episodes={episodes}
-              isLoading={isLoadingEpisodes}
-              currentlyPlaying={currentlyPlaying}
-              onPlayEpisode={onPlayEpisode || (() => {})}
-              onViewEpisode={(episode) => {
-                onClose();
-                setTimeout(() => handleViewEpisode(episode), 300);
-              }}
-            />
+          <div className="flex flex-col h-[calc(85vh-4rem)] overflow-hidden">
+            <div className="p-4 space-y-4 overflow-y-auto">
+              <PodcastHeader
+                title={podcast.title}
+                author={podcast.author}
+                imageUrl={podcast.image}
+                description={podcast.description}
+              />
+              {podcast.taddyTranscribeStatus && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground bg-secondary/50 p-2 rounded-md">
+                  <FileText className="h-4 w-4" />
+                  <span>Transcript available</span>
+                </div>
+              )}
+              <EpisodesList
+                podcastId={podcast.id}
+                episodes={episodes}
+                isLoading={isLoadingEpisodes}
+                currentlyPlaying={currentlyPlaying}
+                onPlayEpisode={onPlayEpisode || (() => {})}
+                onViewEpisode={handleViewEpisode}
+              />
+            </div>
           </div>
         </DrawerContent>
       </Drawer>

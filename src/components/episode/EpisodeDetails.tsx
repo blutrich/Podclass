@@ -1,22 +1,25 @@
 import { Radio } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { SafeImage } from "@/components/ui/SafeImage";
+import { SafeImage } from "@/components/ui/safe-image";
 
 interface EpisodeDetailsProps {
   episode: {
+    id: string;
     name: string;
+    audio_url: string | null;
+    description: string | null;
     podcast?: {
-      name?: string;
-      image_url?: string;
-      description?: string;
-    };
+      id: string;
+      name: string;
+      description: string | null;
+      image_url: string | null;
+    } | null;
   };
   className?: string;
 }
 
 export function EpisodeDetails({ episode, className }: EpisodeDetailsProps) {
-  // ... existing code ...
   return (
     <Card className={cn("overflow-hidden w-full", className)}>
       <CardHeader className="border-b bg-muted/50 p-4">
@@ -45,9 +48,12 @@ export function EpisodeDetails({ episode, className }: EpisodeDetailsProps) {
       </CardHeader>
 
       <CardContent className="grid gap-4 p-4">
-        {/* Episode Metadata */}
         <div className="flex flex-wrap gap-3 text-sm">
-          {/* ... existing metadata items ... */}
+          {episode.description && (
+            <div className="prose prose-sm max-w-none text-muted-foreground">
+              <div dangerouslySetInnerHTML={{ __html: episode.description }} />
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
