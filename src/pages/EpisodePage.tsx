@@ -139,11 +139,23 @@ export function EpisodePage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-background">
-      <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-6 max-w-4xl">
-        <div className="space-y-4 sm:space-y-8">
-          <EpisodeDetails episode={episode} />
-          <LessonView episode={episode} />
+    <div className="min-h-[calc(100vh-4rem)] bg-background overflow-x-hidden">
+      <div className="container mx-auto p-4 max-w-4xl">
+        <Button
+          variant="ghost"
+          onClick={() => navigate('/app')}
+          className="mb-4 -ml-2 hover:bg-transparent hover:text-primary"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          <span className="whitespace-nowrap">Back to Podcasts</span>
+        </Button>
+        <div className="space-y-4 md:space-y-6 w-full">
+          <div className="w-full">
+            <EpisodeDetails episode={episode} />
+          </div>
+          <div className="w-full">
+            <LessonView episode={episode} />
+          </div>
         </div>
       </div>
     </div>
