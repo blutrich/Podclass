@@ -1,29 +1,64 @@
-import { ArrowLeft } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { EpisodeDetails } from "@/components/episode/EpisodeDetails";
-import { LessonView } from "@/components/LessonView";
+import { useToast } from "@/components/ui/use-toast";
+import { ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { EpisodeDetails } from "@/components/EpisodeDetails";
+import { LessonView } from "@/components/LessonView";
+import { useQuery } from "@tanstack/react-query";
+
+interface PodcastData {
+  id: string;
+  name: string;
+  description: string | null;
+  image_url: string | null;
+}
+
+interface EpisodeData {
+  id: string;
+  name: string;
+  audio_url: string | null;
+  description: string | null;
+  transcript: string | null;
+  podcast: PodcastData | null;
+}
 
 export function EpisodePage() {
-  const navigate = useNavigate();
   const { episodeId } = useParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   const { data: episode, isLoading, error } = useQuery({
-    queryKey: ["episode", episodeId],
+    queryKey: ['episode', episodeId],
     queryFn: async () => {
+      console.log('Fetching episode:', episodeId);
+      
+      const { data: { session }, error: authError } = await supabase.auth.getSession();
+      if (authError) {
+        console.error('Auth error:', authError);
+        throw new Error('Authentication error');
+      }
+      
+      if (!session) {
+        toast({
+          title: "Authentication required",
+          description: "Please sign in to view episodes",
+          variant: "destructive",
+        });
+        navigate('/login');
+        return null;
+      }
+
       try {
-        console.log('Fetching episode with ID:', episodeId);
-        
-        const { data, error } = await supabase
-          .from('episodes')
+        const { data: episodeData, error: fetchError } = await supabase
+          .from("episodes")
           .select(`
             id,
             name,
             audio_url,
             description,
+            transcript,
             podcast:podcasts (
               id,
               name,
@@ -31,34 +66,48 @@ export function EpisodePage() {
               image_url
             )
           `)
-          .eq('id', episodeId)
-          .single();
+          .eq("id", episodeId)
+          .maybeSingle();
 
-        if (error) {
-          console.error('Supabase error:', error);
-          throw error;
+        if (fetchError) {
+          console.error('Supabase fetch error:', fetchError);
+          throw fetchError;
         }
 
-        if (!data) {
-          console.error('No episode found with ID:', episodeId);
+        if (!episodeData) {
+          console.log('No episode found with ID:', episodeId);
           throw new Error("Episode not found");
         }
 
-        console.log('Fetched episode data:', data);
-        return data;
+        const transformedEpisode: EpisodeData = {
+          id: episodeData.id,
+          name: episodeData.name,
+          audio_url: episodeData.audio_url,
+          description: episodeData.description,
+          transcript: episodeData.transcript,
+          podcast: episodeData.podcast ? {
+            id: episodeData.podcast.id,
+            name: episodeData.podcast.name,
+            description: episodeData.podcast.description,
+            image_url: episodeData.podcast.image_url
+          } : null
+        };
+
+        console.log('Transformed episode data:', transformedEpisode);
+        return transformedEpisode;
       } catch (error) {
-        console.error('Error in episode query:', error);
+        console.error('Error fetching episode:', error);
         throw error;
       }
     },
-    retry: 3,
+    retry: 5,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
   });
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[100dvh] bg-background px-4">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading episode...</p>
@@ -69,7 +118,7 @@ export function EpisodePage() {
 
   if (error || !episode) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-background p-4">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
         <Alert variant="destructive" className="max-w-md w-full mb-4">
           <AlertDescription>
             {error?.message === "Episode not found"
@@ -83,28 +132,17 @@ export function EpisodePage() {
           className="inline-flex items-center"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Podcasts
+          Back to Podcast
         </Button>
       </div>
     );
   }
 
   return (
-    <div className="min-h-[100dvh] bg-background">
-      <div className="container mx-auto px-4 py-4 max-w-4xl">
-        <Button
-          variant="ghost"
-          onClick={() => navigate('/app')}
-          className="mb-4 -ml-2 hover:bg-transparent hover:text-primary"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          <span className="whitespace-nowrap">Back to Podcasts</span>
-        </Button>
-        
-        <div className="space-y-4 w-full">
-          <EpisodeDetails episode={episode} />
-          <LessonView episode={episode} />
-        </div>
+    <div className="container mx-auto p-6 max-w-4xl">
+      <div className="space-y-8">
+        <EpisodeDetails episode={episode} />
+        <LessonView episode={episode} />
       </div>
     </div>
   );
