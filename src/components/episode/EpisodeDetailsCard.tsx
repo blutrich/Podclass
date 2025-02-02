@@ -67,41 +67,43 @@ export function EpisodeDetailsCard({ episode, className }: EpisodeDetailsCardPro
 
   return (
     <Card className={cn("overflow-hidden", className)}>
-      <CardHeader className="border-b bg-muted/50 pb-4">
-        <div className="flex items-start gap-4">
+      <CardHeader className="border-b bg-muted/50 p-4 sm:pb-4">
+        <div className="flex flex-col sm:flex-row items-start gap-4">
           {episode.podcast?.image_url && (
-            <SafeImage
-              src={episode.podcast.image_url}
-              alt={episode.podcast.name || "Podcast cover"}
-              className="h-24 w-24 rounded-lg object-cover shadow-md"
-            />
+            <div className="w-full sm:w-auto flex justify-center">
+              <SafeImage
+                src={episode.podcast.image_url}
+                alt={episode.podcast.name || "Podcast cover"}
+                className="h-48 w-48 sm:h-24 sm:w-24 rounded-lg object-cover shadow-md"
+              />
+            </div>
           )}
           <div className="flex-1 space-y-1">
-            <CardTitle className="text-xl font-bold leading-tight">
+            <CardTitle className="text-xl font-bold leading-tight break-words">
               {episode.name}
             </CardTitle>
             {episode.podcast?.name && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Radio className="h-4 w-4" />
-                <span>{episode.podcast.name}</span>
+                <span className="break-words">{episode.podcast.name}</span>
               </div>
             )}
           </div>
         </div>
       </CardHeader>
 
-      <CardContent className="grid gap-4 p-6">
+      <CardContent className="grid gap-4 p-4 sm:p-6">
         {/* Episode Metadata */}
         <div className="flex flex-wrap gap-4 text-sm">
           {episode.published_at && (
             <div className="flex items-center gap-2 text-muted-foreground">
-              <Calendar className="h-4 w-4" />
+              <Calendar className="h-4 w-4 flex-shrink-0" />
               <span>{format(new Date(episode.published_at), 'MMMM d, yyyy')}</span>
             </div>
           )}
           {episode.duration && (
             <div className="flex items-center gap-2 text-muted-foreground">
-              <Clock className="h-4 w-4" />
+              <Clock className="h-4 w-4 flex-shrink-0" />
               <span>{episode.duration}</span>
             </div>
           )}
@@ -150,7 +152,7 @@ export function EpisodeDetailsCard({ episode, className }: EpisodeDetailsCardPro
         {cleanedDescription && (
           <div className="space-y-2">
             <h3 className="font-medium">Episode Description</h3>
-            <div className="prose prose-sm max-w-none text-muted-foreground">
+            <div className="prose prose-sm max-w-none text-muted-foreground break-words">
               <div dangerouslySetInnerHTML={{ __html: cleanedDescription }} />
             </div>
           </div>
