@@ -139,8 +139,8 @@ export function EpisodePage() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <div className="space-y-8">
+    <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-6 max-w-4xl">
+      <div className="space-y-4 sm:space-y-8">
         <EpisodeDetails episode={episode} />
         <LessonView episode={episode} />
       </div>
