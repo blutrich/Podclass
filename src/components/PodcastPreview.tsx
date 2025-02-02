@@ -111,12 +111,12 @@ export function PodcastPreview({
   if (isMobile) {
     return (
       <Drawer open={isOpen} onOpenChange={onClose}>
-        <DrawerContent className="h-[85vh]">
+        <DrawerContent className="h-[85vh] overflow-hidden">
           <DrawerHeader className="border-b">
             <DrawerTitle>{podcast.title}</DrawerTitle>
             <DrawerDescription>{podcast.author}</DrawerDescription>
           </DrawerHeader>
-          <div className="p-4 space-y-4">
+          <div className="p-4 space-y-4 overflow-y-auto">
             <PodcastHeader
               title={podcast.title}
               author={podcast.author}
@@ -135,7 +135,10 @@ export function PodcastPreview({
               isLoading={isLoadingEpisodes}
               currentlyPlaying={currentlyPlaying}
               onPlayEpisode={onPlayEpisode || (() => {})}
-              onViewEpisode={handleViewEpisode}
+              onViewEpisode={(episode) => {
+                onClose();
+                setTimeout(() => handleViewEpisode(episode), 300);
+              }}
             />
           </div>
         </DrawerContent>
