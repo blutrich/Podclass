@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Calendar, Clock, FileText, Play, Pause, Plus } from "lucide-react";
 import { format } from "date-fns";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface EpisodeItemProps {
   episode: {
@@ -18,7 +19,7 @@ interface EpisodeItemProps {
   onAddToQueue?: (episode: any) => void;
 }
 
-export const EpisodeItem = ({ 
+export const EpisodeItem = ({
   episode, 
   isPlaying, 
   currentAudioUrl, 
@@ -26,8 +27,33 @@ export const EpisodeItem = ({
   onViewEpisode,
   onAddToQueue
 }: EpisodeItemProps) => {
+  const isMobile = useIsMobile();
+
+  const handleViewClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onViewEpisode(episode);
+  };
+
+  const handlePlayClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onPlay(episode.audioUrl);
+  };
+
+  const handleQueueClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onAddToQueue?.(episode);
+  };
+
   return (
-    <div className="p-4 hover:bg-secondary/50 transition-colors">
+    <div 
+      className="p-4 hover:bg-secondary/50 transition-colors"
+      onClick={isMobile ? handleViewClick : undefined}
+      role={isMobile ? "button" : undefined}
+      tabIndex={isMobile ? 0 : undefined}
+    >
       <div className="flex flex-col gap-4">
         <div className="flex-1 min-w-0 space-y-3">
           <h4 className="text-base font-medium leading-tight">{episode.title}</h4>
@@ -56,7 +82,7 @@ export const EpisodeItem = ({
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => onPlay(episode.audioUrl)}
+            onClick={handlePlayClick}
             className="h-10 w-10 flex-shrink-0"
           >
             {isPlaying && currentAudioUrl === episode.audioUrl ? (
@@ -68,7 +94,7 @@ export const EpisodeItem = ({
           <Button
             size="default"
             variant="default"
-            onClick={() => onViewEpisode(episode)}
+            onClick={handleViewClick}
             className="flex-1 min-w-0"
           >
             <FileText className="h-4 w-4 mr-2 flex-shrink-0" />
@@ -78,7 +104,7 @@ export const EpisodeItem = ({
             <Button
               size="icon"
               variant="outline"
-              onClick={() => onAddToQueue(episode)}
+              onClick={handleQueueClick}
               className="flex-shrink-0"
               title="Add to queue"
             >
