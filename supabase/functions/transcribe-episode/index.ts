@@ -67,7 +67,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         audio_url: audioUrl,
-        language_detection: true,
+        language_code: 'en',
         speaker_labels: true,
         auto_chapters: true
       }),
