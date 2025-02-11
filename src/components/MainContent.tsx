@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PodcastSearch } from "./podcast/PodcastSearch";
 import { AudioPlayer } from "./podcast/AudioPlayer";
 import { PodcastPreview } from "./PodcastPreview";
@@ -31,36 +31,58 @@ interface Episode {
   publishedAt?: string;
 }
 
+interface SearchState {
+  searchQuery: string;
+  podcastUrl: string;
+  searchType: "name" | "url";
+  searchResults: any[];
+  selectedPodcast: Podcast | null;
+}
+
+const STORAGE_KEYS = {
+  SEARCH_QUERY: 'podclass_search_query',
+  PODCAST_URL: 'podclass_podcast_url',
+  SEARCH_TYPE: 'podclass_search_type',
+  SEARCH_RESULTS: 'podclass_search_results',
+  SELECTED_PODCAST: 'podclass_selected_podcast',
+  NAVIGATION_HISTORY: 'podclass_navigation_history'
+} as const;
+
 export function MainContent() {
+  const queryClient = useQueryClient();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const initialSearchState: SearchState = {
+    searchQuery: localStorage.getItem(STORAGE_KEYS.SEARCH_QUERY) || '',
+    podcastUrl: localStorage.getItem(STORAGE_KEYS.PODCAST_URL) || '',
+    searchType: (localStorage.getItem(STORAGE_KEYS.SEARCH_TYPE) as "name" | "url") || "name",
+    searchResults: JSON.parse(localStorage.getItem(STORAGE_KEYS.SEARCH_RESULTS) || '[]'),
+    selectedPodcast: JSON.parse(localStorage.getItem(STORAGE_KEYS.SELECTED_PODCAST) || 'null'),
+  };
+
+  // Use React Query for state management with proper typing
+  const { data: searchState } = useQuery<SearchState>({
+    queryKey: ['searchState'],
+    queryFn: () => initialSearchState,
+    staleTime: Infinity,
+  });
+
+  const [searchQuery, setSearchQuery] = useState(searchState?.searchQuery || initialSearchState.searchQuery);
+  const [podcastUrl, setPodcastUrl] = useState(searchState?.podcastUrl || initialSearchState.podcastUrl);
+  const [searchType, setSearchType] = useState<"name" | "url">(searchState?.searchType || initialSearchState.searchType);
+  const [searchResults, setSearchResults] = useState<any[]>(searchState?.searchResults || initialSearchState.searchResults);
+  const [previewPodcast, setPreviewPodcast] = useState<Podcast | null>(searchState?.selectedPodcast || initialSearchState.selectedPodcast);
   const [selectedEpisode, setSelectedEpisode] = useState<{
     id: string;
     name: string;
     transcript?: string;
   } | null>(null);
-  const [searchQuery, setSearchQuery] = useState(() => {
-    const saved = localStorage.getItem('lastSearchQuery');
-    return saved || "";
-  });
-  const [podcastUrl, setPodcastUrl] = useState(() => {
-    const saved = localStorage.getItem('lastPodcastUrl');
-    return saved || "";
-  });
   const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<any[]>(() => {
-    const saved = localStorage.getItem('lastSearchResults');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [searchType, setSearchType] = useState<"name" | "url">(() => {
-    const saved = localStorage.getItem('lastSearchType');
-    return (saved as "name" | "url") || "name";
-  });
-  const [previewPodcast, setPreviewPodcast] = useState<Podcast | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
   const { toast } = useToast();
-  const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const location = useLocation();
 
   const { data: episodes, isLoading: isLoadingEpisodes } = useQuery({
     queryKey: ['episodes', previewPodcast?.id],
@@ -116,28 +138,64 @@ export function MainContent() {
     checkAuth();
   }, [navigate, toast]);
 
-  // Save search state to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem('lastSearchQuery', searchQuery);
-    localStorage.setItem('lastPodcastUrl', podcastUrl);
-    localStorage.setItem('lastSearchType', searchType);
-    localStorage.setItem('lastSearchResults', JSON.stringify(searchResults));
-  }, [searchQuery, podcastUrl, searchType, searchResults]);
-
-  // Clear search state when navigating away from the main page
-  useEffect(() => {
-    return () => {
-      if (!location.pathname.includes('/episode/')) {
-        localStorage.removeItem('lastSearchQuery');
-        localStorage.removeItem('lastPodcastUrl');
-        localStorage.removeItem('lastSearchType');
-        localStorage.removeItem('lastSearchResults');
-      }
+  // Save state to localStorage and React Query cache
+  const saveState = () => {
+    const currentState = {
+      searchQuery,
+      podcastUrl,
+      searchType,
+      searchResults,
+      selectedPodcast: previewPodcast,
     };
+
+    // Update localStorage
+    Object.entries(currentState).forEach(([key, value]) => {
+      localStorage.setItem(
+        STORAGE_KEYS[key.toUpperCase() as keyof typeof STORAGE_KEYS],
+        typeof value === 'object' ? JSON.stringify(value) : value
+      );
+    });
+
+    // Update React Query cache
+    queryClient.setQueryData(['searchState'], currentState);
+  };
+
+  // Save state when component updates
+  useEffect(() => {
+    saveState();
+  }, [searchQuery, podcastUrl, searchType, searchResults, previewPodcast]);
+
+  // Save navigation history
+  useEffect(() => {
+    const history = JSON.parse(
+      localStorage.getItem(STORAGE_KEYS.NAVIGATION_HISTORY) || '[]'
+    );
+    
+    if (location.pathname !== history[history.length - 1]) {
+      history.push(location.pathname);
+      localStorage.setItem(STORAGE_KEYS.NAVIGATION_HISTORY, JSON.stringify(history));
+    }
   }, [location]);
 
+  // Handle back navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const state = queryClient.getQueryData(['searchState']);
+      if (state) {
+        setSearchQuery(state.searchQuery);
+        setPodcastUrl(state.podcastUrl);
+        setSearchType(state.searchType);
+        setSearchResults(state.searchResults);
+        setPreviewPodcast(state.selectedPodcast);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [queryClient]);
+
   const handlePodcastClick = async (podcast: any) => {
-    setPreviewPodcast({
+    const newPreviewPodcast = {
       id: podcast.uuid,
       title: podcast.name,
       author: podcast.author || "",
@@ -147,7 +205,10 @@ export function MainContent() {
       rssUrl: podcast.rssUrl,
       language: podcast.language,
       genres: podcast.genres,
-    });
+    };
+    
+    setPreviewPodcast(newPreviewPodcast);
+    saveState(); // Save state after selecting a podcast
   };
 
   const handlePlayEpisode = (audioUrl: string) => {
@@ -207,6 +268,7 @@ export function MainContent() {
 
       if (data?.data?.searchResults) {
         setSearchResults(data.data.searchResults);
+        saveState(); // Save state after successful search
         toast({
           title: "Search successful",
           description: `Found ${data.data.searchResults.length} matching podcasts`,
