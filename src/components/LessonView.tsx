@@ -290,13 +290,8 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
       // Log the full response for debugging
       console.log('Generated lesson response:', generatedLesson);
 
-      if (!generatedLesson?.data) {
-        console.error('No response received');
-        throw new Error("No response received from lesson generation");
-      }
-
       // Extract the lesson content from the response
-      const lessonContent = generatedLesson.data;
+      const lessonContent = generatedLesson?.content || generatedLesson?.data;
       console.log('Raw lesson content:', lessonContent);
 
       // Validate the content structure
@@ -308,6 +303,18 @@ export const LessonView = ({ episode }: { episode: Episode }) => {
         });
         throw new Error("Invalid or empty lesson content received");
       }
+
+      // Add additional logging to see the exact structure
+      console.log('Lesson content structure:', {
+        title: lessonContent.title,
+        titleType: typeof lessonContent.title,
+        summary: lessonContent.summary,
+        summaryType: typeof lessonContent.summary,
+        hasKeyTakeaways: Array.isArray(lessonContent.key_takeaways),
+        hasCoreConcepts: Array.isArray(lessonContent.core_concepts),
+        hasPracticalExamples: Array.isArray(lessonContent.practical_examples),
+        hasActionSteps: Array.isArray(lessonContent.action_steps)
+      });
 
       // Transform the content to match our database structure
       const transformedContent = {
