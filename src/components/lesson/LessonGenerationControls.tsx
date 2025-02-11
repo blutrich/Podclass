@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Save, Loader2, FileText, CheckCircle2, Copy, Check } from "lucide-react";
+import { Save, Loader2, FileText, CheckCircle2, Copy, Check, Download } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ interface Episode {
   id: string;
   audio_url?: string;
   transcript?: string;
+  name?: string;
 }
 
 interface LessonGenerationControlsProps {
@@ -29,6 +30,7 @@ export const LessonGenerationControls = ({
 }: LessonGenerationControlsProps) => {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcriptionProgress, setTranscriptionProgress] = useState(0);
+  const [isSavingTranscript, setIsSavingTranscript] = useState(false);
   const queryClient = useQueryClient();
   const [isGeneratingLesson, setIsGeneratingLesson] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
@@ -187,6 +189,47 @@ export const LessonGenerationControls = ({
     }
   };
 
+  const handleSaveTranscript = async () => {
+    if (!episode.transcript) {
+      toast.error("No transcript available to save");
+      return;
+    }
+
+    try {
+      setIsSavingTranscript(true);
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Please sign in to save transcripts");
+        return;
+      }
+
+      const { error: saveError } = await supabase
+        .from('saved_transcripts')
+        .insert({
+          episode_id: episode.id,
+          content: episode.transcript,
+          episode_name: episode.name || 'Untitled Episode',
+          user_id: session.user.id
+        });
+
+      if (saveError) {
+        if (saveError.code === '23505') { // Unique constraint error
+          toast.error("Transcript already saved");
+        } else {
+          throw saveError;
+        }
+      } else {
+        toast.success("Transcript saved successfully");
+      }
+    } catch (error) {
+      console.error("Error saving transcript:", error);
+      toast.error("Failed to save transcript");
+    } finally {
+      setIsSavingTranscript(false);
+    }
+  };
+
   return (
     <div className="relative space-y-0 pb-8">
       {/* Progress Line */}
@@ -265,6 +308,24 @@ export const LessonGenerationControls = ({
                     <>
                       <Copy className="h-4 w-4 mr-2" />
                       Copy Transcript
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleSaveTranscript}
+                  className="text-sm"
+                  disabled={!episode.transcript || isSavingTranscript}
+                >
+                  {isSavingTranscript ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 mr-2" />
+                      Save Transcript
                     </>
                   )}
                 </Button>
