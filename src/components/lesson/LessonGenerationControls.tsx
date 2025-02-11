@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Save, Loader2, FileText, CheckCircle2 } from "lucide-react";
+import { Save, Loader2, FileText, CheckCircle2, Copy, Check } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -32,6 +32,7 @@ export const LessonGenerationControls = ({
   const queryClient = useQueryClient();
   const [isGeneratingLesson, setIsGeneratingLesson] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
+  const [hasCopied, setHasCopied] = useState(false);
 
   const handleTranscribe = async () => {
     if (!episode.audio_url) {
@@ -173,6 +174,19 @@ export const LessonGenerationControls = ({
     }
   };
 
+  const handleCopyTranscript = async () => {
+    if (episode.transcript) {
+      try {
+        await navigator.clipboard.writeText(episode.transcript);
+        setHasCopied(true);
+        toast.success("Transcript copied to clipboard");
+        setTimeout(() => setHasCopied(false), 2000);
+      } catch (err) {
+        toast.error("Failed to copy transcript");
+      }
+    }
+  };
+
   return (
     <div className="relative space-y-0 pb-8">
       {/* Progress Line */}
@@ -228,13 +242,33 @@ export const LessonGenerationControls = ({
             </Button>
 
             {hasTranscript && (
-              <Button
-                variant="ghost"
-                onClick={() => setShowTranscript(!showTranscript)}
-                className="text-sm hover:bg-gray-100"
-              >
-                {showTranscript ? "Hide Transcript" : "Show Transcript"}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowTranscript(!showTranscript)}
+                  className="text-sm hover:bg-gray-100"
+                >
+                  {showTranscript ? "Hide Transcript" : "Show Transcript"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleCopyTranscript}
+                  className="text-sm"
+                  disabled={!episode.transcript}
+                >
+                  {hasCopied ? (
+                    <>
+                      <Check className="h-4 w-4 mr-2" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy Transcript
+                    </>
+                  )}
+                </Button>
+              </div>
             )}
           </div>
 
